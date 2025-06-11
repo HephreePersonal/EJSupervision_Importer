@@ -4,6 +4,15 @@ This project contains several ETL scripts used to migrate data between
 Justice, Operations and Financial databases.  Each script can be executed
 independently or together using the new `run_etl.py` helper.
 
+## Installation
+
+Install the required packages using pip:
+
+```bash
+pip install -r requirements.txt
+```
+
+
 ## Usage
 
 1. Run `python run_etl.py`.
