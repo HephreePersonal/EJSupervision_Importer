@@ -7,7 +7,7 @@ load_dotenv()
 
 # Import Config from settings.py
 try:
-    from etl_sandbox.settings import Config
+    from config.settings import Config
 except ImportError:
     Config = None
 
