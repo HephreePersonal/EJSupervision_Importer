@@ -12,8 +12,6 @@ def log_exception_to_file(error_details: str, log_path: str):
             f.write(error_details + "\n")
     except Exception as file_exc:
         logger.error(f"Failed to write to error log file: {file_exc}")
-
-
 def load_sql(filename: str) -> str:
     """Load a SQL file from the sql_scripts directory."""
     base_dir = os.path.dirname(os.path.dirname(__file__)) if '__file__' in globals() else os.getcwd()
@@ -24,8 +22,6 @@ def load_sql(filename: str) -> str:
         raise FileNotFoundError(f"SQL file not found: {sql_path}")
     with open(sql_path, 'r', encoding='utf-8') as f:
         return f.read()
-
-
 def run_sql_step(conn, name: str, sql: str):
     """Execute a single SQL statement and fetch any results."""
     logger.info(f"Starting step: {name}")
@@ -46,8 +42,6 @@ def run_sql_step(conn, name: str, sql: str):
     except Exception as e:
         logger.error(f"Error in step {name}: {str(e)}")
         raise
-
-
 def run_sql_script(conn, name: str, sql: str):
     """Execute a multi-statement SQL script."""
     logger.info(f"Starting script: {name}")
