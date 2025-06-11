@@ -1,1 +1,25 @@
-# TylerESUP_Working
+# EJ Supervision Importer
+
+This project contains several ETL scripts used to migrate data between
+Justice, Operations and Financial databases.  Each script can be executed
+independently or together using the new `run_etl.py` helper.
+
+## Usage
+
+1. Run `python run_etl.py`.
+2. Enter the connection details for the target SQL Server database.
+3. Select which scripts to execute and click **Run**.
+
+The connection string will be built from the provided details and passed to
+the selected ETL scripts using the `MSSQL_TARGET_CONN_STR` environment
+variable.
+
+## ETL Scripts
+
+- **01_JusticeDB_Import.py** – migrates Justice database tables.
+- **02_OperationsDB_Import.py** – migrates Operations database tables.
+- **03_FinancialDB_Import.py** – migrates Financial database tables.
+- **04_LOBColumns.py** – adjusts large object column lengths.
+
+Each script expects SQL files located in the `sql_scripts/` directory and
+relies on `MSSQL_TARGET_CONN_STR` for the target connection string.
