@@ -1,1 +1,0 @@
-SELECT TOP 1 * FROM EJSupervision_Importer WHERE 1=0;
