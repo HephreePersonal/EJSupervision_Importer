@@ -1,6 +1,7 @@
 import logging
 import time
 import os
+import argparse
 from dotenv import load_dotenv
 import pandas as pd
 import urllib
@@ -22,7 +23,15 @@ from utils.etl_helpers import (
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
-LOG_FILE = r"C:\\LargeFileHolder\\7373\\PreDMSErrorLog_LOBS.txt"
+DEFAULT_LOG_FILE = "PreDMSErrorLog_LOBS.txt"
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="LOB Column Processing")
+    parser.add_argument(
+        "--log-file",
+        help="Path to the error log file. Overrides the EJ_LOG_DIR environment variable.",
+    )
+    return parser.parse_args()
 def get_max_length(conn, schema, table, column, datatype):
     cursor = conn.cursor()
     try:
@@ -50,8 +59,10 @@ def build_alter_column_sql(schema, table, column, datatype, max_length):
         return f"ALTER TABLE [{schema}].[{table}] ALTER COLUMN [{column}] VARCHAR({max_length}) NULL"
 
 def main():
+    args = parse_args()
     load_dotenv()
     include_empty = os.environ.get("INCLUDE_EMPTY_TABLES", "0") == "1"
+    log_file = args.log_file or os.path.join(os.environ.get("EJ_LOG_DIR", ""), DEFAULT_LOG_FILE)
     target_conn = get_target_connection()
 
     try:
@@ -132,7 +143,7 @@ def main():
         logger.exception("Unexpected error")
         import traceback
         error_details = traceback.format_exc()
-        log_exception_to_file(error_details, LOG_FILE)
+        log_exception_to_file(error_details, log_file)
         try:
             root = tk.Tk()
             root.withdraw()  # Hide the main window

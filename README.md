@@ -36,3 +36,8 @@ Each script expects SQL files located in the `sql_scripts/` directory and
 relies on `MSSQL_TARGET_CONN_STR` for the target connection string. When a CSV
 directory is selected, the path is exported via the `EJ_CSV_DIR` environment
 variable so the ETL scripts can locate their input files.
+
+Error details are written to log files. By default the logs are created in the
+current working directory with names like `PreDMSErrorLog_Justice.txt`. Set the
+`EJ_LOG_DIR` environment variable to override the directory or pass a full path
+using the `--log-file` argument when running an individual script.
