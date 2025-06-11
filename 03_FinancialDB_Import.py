@@ -7,7 +7,6 @@ import pandas as pd
 import urllib
 import sqlalchemy
 from db.mssql import get_target_connection
-from botocore.exceptions import ClientError
 from tqdm import tqdm
 from sqlalchemy.types import Text
 import tkinter as tk
@@ -166,7 +165,7 @@ def main():
                 target_conn.close()
             return
 
-    except (ClientError, Exception) as e:
+    except Exception as e:
         logger.exception("Unexpected error")
         import traceback
         error_details = traceback.format_exc()
