@@ -179,10 +179,6 @@ def main():
                 target_conn.close()
             return
 
-
-        logger.info("HEYYYY NOW IS THE TIME TO PROCESS THE FINANCIAL DATABASE!!!!")
-
-
     except (ClientError, Exception) as e:
         logger.exception("Unexpected error")
         import traceback
