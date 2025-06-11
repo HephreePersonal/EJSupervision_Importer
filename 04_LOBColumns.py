@@ -12,58 +12,17 @@ from sqlalchemy.types import Text
 import tkinter as tk
 from tkinter import messagebox
 
+from utils.etl_helpers import (
+    log_exception_to_file,
+    load_sql,
+    run_sql_step,
+    run_sql_script,
+)
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
-def log_exception_to_file(error_details, log_path=r"C:\LargeFileHolder\7373\PreDMSErrorLog_LOBS.txt"):
-    try:
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(error_details + "\n")
-    except Exception as file_exc:
-        logger.error(f"Failed to write to error log file: {file_exc}")
-def load_sql(filename):
-    base_dir = os.path.dirname(__file__)
-    sql_path = os.path.join(base_dir, 'sql_scripts', filename)
-    if not os.path.exists(sql_path):
-        logger.error(f"SQL file not found: {sql_path}")
-        raise FileNotFoundError(f"SQL file not found: {sql_path}")
-    with open(sql_path, 'r', encoding='utf-8') as f:
-        return f.read()
-def run_sql_step(conn, name, sql):
-    logger.info(f"Starting step: {name}")
-    start_time = time.time()
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql)
-        try:
-            results = cursor.fetchall()
-            logger.info(f"{name}: Retrieved {len(results)} rows")
-        except Exception:
-            results = None
-            logger.info(f"{name}: Statement executed (no results to fetch)")
-        cursor.close()
-        elapsed = time.time() - start_time
-        logger.info(f"Completed step: {name} in {elapsed:.2f} seconds")
-        return results
-    except Exception as e:
-        logger.error(f"Error in step {name}: {str(e)}")
-        raise
-def run_sql_script(conn, name, sql):
-    logger.info(f"Starting script: {name}")
-    start_time = time.time()
-    try:
-        cursor = conn.cursor()
-        # Split on semicolon, filter out empty statements
-        statements = [stmt.strip() for stmt in sql.split(';') if stmt.strip()]
-        for stmt in statements:
-            cursor.execute(stmt)
-            conn.commit()  # Commit after each statement
-        cursor.close()
-        elapsed = time.time() - start_time
-        logger.info(f"Completed script: {name} in {elapsed:.2f} seconds")
-    except Exception as e:
-        logger.error(f"Error in script {name}: {str(e)}")
-        raise
+LOG_FILE = r"C:\\LargeFileHolder\\7373\\PreDMSErrorLog_LOBS.txt"
 def get_max_length(conn, schema, table, column, datatype):
     cursor = conn.cursor()
     try:
@@ -173,7 +132,7 @@ def main():
         logger.exception("Unexpected error")
         import traceback
         error_details = traceback.format_exc()
-        log_exception_to_file(error_details)  # <-- Add this line
+        log_exception_to_file(error_details, LOG_FILE)
         try:
             root = tk.Tk()
             root.withdraw()  # Hide the main window
