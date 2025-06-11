@@ -100,7 +100,12 @@ def main():
         db_url = f"mssql+pyodbc:///?odbc_connect={params}"
         engine = sqlalchemy.create_engine(db_url)
 
-        df = pd.read_csv(r'C:\Users\jeff.reichert\OneDrive - Tyler Technologies, Inc\Documents\GitHub\tx_elpaso_7373\Pre-DMS\EJ_Justice_Selects_ALL.csv', delimiter='|')
+        csv_dir = os.environ.get("EJ_CSV_DIR")
+        if not csv_dir:
+            raise EnvironmentError("EJ_CSV_DIR environment variable is not set")
+        csv_path = os.path.join(csv_dir, "EJ_Justice_Selects.csv")
+
+        df = pd.read_csv(csv_path, delimiter='|')
         df = df.astype({'DatabaseName': 'str','SchemaName': 'str','TableName': 'str','Freq': 'str','InScopeFreq': 'str','Select_Only': 'str','fConvert': 'str','Drop_IfExists': 'str','Selection': 'str','Select_Into': 'str'})
         df.to_sql(
             'TableUsedSelects',
