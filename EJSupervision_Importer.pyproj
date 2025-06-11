@@ -1,0 +1,71 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>3fd72a63-f71a-4600-97a6-4bba4bca3b96</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <StartupFile>01_JusticeDB_Import.py</StartupFile>
+    <SearchPath>
+    </SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <Name>EJSupervision_Importer</Name>
+    <RootNamespace>EJSupervision_Importer</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="01_JusticeDB_Import.py" />
+    <Compile Include="02_OperationsDB_Import.py" />
+    <Compile Include="03_FinancialDB_Import.py" />
+    <Compile Include="04_LOBColumns.py" />
+    <Compile Include="config\settings.py" />
+    <Compile Include="db\mssql.py" />
+    <Compile Include="db\mysql.py" />
+    <Compile Include="EJSupervision_Importer.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="config\" />
+    <Folder Include="config\__pycache__\" />
+    <Folder Include="db\" />
+    <Folder Include="db\__pycache__\" />
+    <Folder Include="sql_scripts\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include=".env" />
+    <Content Include="sql_scripts\create_primarykeys.sql" />
+    <Content Include="sql_scripts\create_primarykeys_financial.sql" />
+    <Content Include="sql_scripts\create_primarykeys_operations.sql" />
+    <Content Include="sql_scripts\gather_caseids.sql" />
+    <Content Include="sql_scripts\gather_chargeids.sql" />
+    <Content Include="sql_scripts\gather_documentids.sql" />
+    <Content Include="sql_scripts\gather_drops_and_selects.sql" />
+    <Content Include="sql_scripts\gather_drops_and_selects_financial.sql" />
+    <Content Include="sql_scripts\gather_drops_and_selects_operations.sql" />
+    <Content Include="sql_scripts\gather_eventids.sql" />
+    <Content Include="sql_scripts\gather_feeinstanceids.sql" />
+    <Content Include="sql_scripts\gather_hearingids.sql" />
+    <Content Include="sql_scripts\gather_lobs.sql" />
+    <Content Include="sql_scripts\gather_partyids.sql" />
+    <Content Include="sql_scripts\gather_warrantids.sql" />
+    <Content Include="sql_scripts\test_select.sql" />
+    <Content Include="sql_scripts\update_joins.sql" />
+    <Content Include="sql_scripts\update_joins_financial.sql" />
+    <Content Include="sql_scripts\update_joins_operations.sql" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+  <!-- Uncomment the CoreCompile target to enable the Build command in
+       Visual Studio and specify your pre- and post-build commands in
+       the BeforeBuild and AfterBuild targets below. -->
+  <!--<Target Name="CoreCompile" />-->
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+</Project>
