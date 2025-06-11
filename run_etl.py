@@ -2,7 +2,7 @@ import os
 import sys
 import subprocess
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, scrolledtext, filedialog
 import pyodbc
 
 SCRIPTS = [
@@ -18,6 +18,7 @@ class App(tk.Tk):
         self.title("EJ Supervision Importer")
         self.resizable(False, False)
         self.conn_str = None
+        self.csv_dir = ""
         self._create_connection_widgets()
 
     def _create_connection_widgets(self):
@@ -32,20 +33,34 @@ class App(tk.Tk):
             ent.grid(row=i, column=1, padx=5, pady=2)
             self.entries[field.lower()] = ent
 
+        row = len(fields)
+        lbl = tk.Label(self, text="CSV Directory:")
+        lbl.grid(row=row, column=0, sticky="e", padx=5, pady=2)
+        self.csv_dir_var = tk.StringVar()
+        ent = tk.Entry(self, textvariable=self.csv_dir_var, width=40)
+        ent.grid(row=row, column=1, padx=5, pady=2)
+        browse_btn = tk.Button(self, text="Browse", command=self._browse_csv_dir)
+        browse_btn.grid(row=row, column=2, padx=5, pady=2)
+
         # checkbox to include empty tables
         self.include_empty_var = tk.BooleanVar(value=False)
         chk = tk.Checkbutton(self, text="Include empty tables", variable=self.include_empty_var)
-        chk.grid(row=len(fields), column=0, columnspan=2, pady=(5, 0))
+        chk.grid(row=row+1, column=0, columnspan=2, pady=(5, 0))
 
         test_btn = tk.Button(self, text="Test Connection", command=self.test_connection)
-        test_btn.grid(row=len(fields)+1, column=0, columnspan=2, pady=10)
+        test_btn.grid(row=row+2, column=0, columnspan=2, pady=10)
+
+    def _browse_csv_dir(self):
+        directory = filedialog.askdirectory()
+        if directory:
+            self.csv_dir_var.set(directory)
 
     def _show_script_widgets(self):
         if hasattr(self, "script_frame"):
             return
 
         self.script_frame = tk.Frame(self)
-        start_row = len(self.entries) + 1
+        start_row = len(self.entries) + 3
         self.script_frame.grid(row=start_row, column=0, columnspan=2, sticky="nsew")
 
         for idx, (label, path) in enumerate(sorted(SCRIPTS, key=lambda x: x[1])):
@@ -89,6 +104,9 @@ class App(tk.Tk):
         messagebox.showinfo("Success", "Connection successful!")
         self.conn_str = conn_str
         os.environ["MSSQL_TARGET_CONN_STR"] = conn_str
+        self.csv_dir = self.csv_dir_var.get()
+        if self.csv_dir:
+            os.environ["EJ_CSV_DIR"] = self.csv_dir
         self._show_script_widgets()
 
     def run_script(self, path):

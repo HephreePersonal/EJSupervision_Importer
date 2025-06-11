@@ -7,7 +7,9 @@ independently or together using the new `run_etl.py` helper.
 ## Usage
 
 1. Run `python run_etl.py`.
-2. Enter the connection details for the target SQL Server database.
+2. Enter the connection details for the target SQL Server database. Use the
+   **CSV Directory** field to browse for the folder containing the CSV files
+   used by the ETL scripts.
 3. Select which scripts to execute and click **Run**.
 
 The connection string will be built from the provided details and passed to
@@ -22,4 +24,6 @@ variable.
 - **04_LOBColumns.py** – adjusts large object column lengths.
 
 Each script expects SQL files located in the `sql_scripts/` directory and
-relies on `MSSQL_TARGET_CONN_STR` for the target connection string.
+relies on `MSSQL_TARGET_CONN_STR` for the target connection string. When a CSV
+directory is selected, the path is exported via the `EJ_CSV_DIR` environment
+variable so the ETL scripts can locate their input files.
