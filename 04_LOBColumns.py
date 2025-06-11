@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import pandas as pd
 import urllib
 import sqlalchemy
-from etl_sandbox.db.mssql import get_target_connection
+from db.mssql import get_target_connection
 from botocore.exceptions import ClientError
 from tqdm import tqdm
 from sqlalchemy.types import Text
