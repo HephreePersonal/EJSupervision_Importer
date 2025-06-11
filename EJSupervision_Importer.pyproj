@@ -29,6 +29,11 @@
     <Compile Include="db\mssql.py" />
     <Compile Include="db\mysql.py" />
     <Compile Include="run_etl.py" />
+    <Compile Include="tests\test_mssql.py" />
+    <Compile Include="tests\test_mysql.py" />
+    <Compile Include="tests\__init__.py" />
+    <Compile Include="utils\etl_helpers.py" />
+    <Compile Include="utils\__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="config\" />
@@ -40,6 +45,8 @@
     <Folder Include="sql_scripts\justice\" />
     <Folder Include="sql_scripts\lob\" />
     <Folder Include="sql_scripts\operations\" />
+    <Folder Include="tests\" />
+    <Folder Include="utils\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".env" />
