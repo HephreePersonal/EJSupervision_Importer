@@ -32,8 +32,13 @@ class App(tk.Tk):
             ent.grid(row=i, column=1, padx=5, pady=2)
             self.entries[field.lower()] = ent
 
+        # checkbox to include empty tables
+        self.include_empty_var = tk.BooleanVar(value=False)
+        chk = tk.Checkbutton(self, text="Include empty tables", variable=self.include_empty_var)
+        chk.grid(row=len(fields), column=0, columnspan=2, pady=(5, 0))
+
         test_btn = tk.Button(self, text="Test Connection", command=self.test_connection)
-        test_btn.grid(row=len(fields), column=0, columnspan=2, pady=10)
+        test_btn.grid(row=len(fields)+1, column=0, columnspan=2, pady=10)
 
     def _show_script_widgets(self):
         if hasattr(self, "script_frame"):
@@ -90,6 +95,7 @@ class App(tk.Tk):
         if not self.conn_str:
             messagebox.showerror("Error", "Please test the connection first")
             return
+        os.environ["INCLUDE_EMPTY_TABLES"] = "1" if self.include_empty_var.get() else "0"
         self.output_text.insert(tk.END, f"Running {path}...\n")
         self.output_text.see(tk.END)
         try:
