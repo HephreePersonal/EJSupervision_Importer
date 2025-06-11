@@ -56,6 +56,11 @@ def build_alter_column_sql(schema, table, column, datatype, max_length):
         return f"ALTER TABLE [{schema}].[{table}] ALTER COLUMN [{column}] TEXT NULL"
     else:
         return f"ALTER TABLE [{schema}].[{table}] ALTER COLUMN [{column}] VARCHAR({max_length}) NULL"
+def validate_environment():
+    required_vars = ['MSSQL_TARGET_CONN_STR', 'EJ_CSV_DIR']
+    missing = [var for var in required_vars if not os.environ.get(var)]
+    if missing:
+        raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
 
 def main():
     args = parse_args()

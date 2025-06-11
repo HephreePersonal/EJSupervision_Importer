@@ -32,6 +32,12 @@ def parse_args():
     )
     return parser.parse_args()
 
+def validate_environment():
+    required_vars = ['MSSQL_TARGET_CONN_STR', 'EJ_CSV_DIR']
+    missing = [var for var in required_vars if not os.environ.get(var)]
+    if missing:
+        raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
+
 def main():
     args = parse_args()
     load_dotenv()
