@@ -93,6 +93,8 @@ def main():
         if not csv_dir:
             raise EnvironmentError("EJ_CSV_DIR environment variable is not set")
         csv_path = os.path.join(csv_dir, "EJ_Financial_Selects.csv")
+        if not os.path.exists(csv_path):
+            raise FileNotFoundError(f"CSV file not found: {csv_path}")
 
         df = pd.read_csv(csv_path, delimiter='|')
         df = df.astype({'DatabaseName': 'str','SchemaName': 'str','TableName': 'str','Freq': 'str','InScopeFreq': 'str','Select_Only': 'str','fConvert': 'str','Drop_IfExists': 'str','Selection': 'str','Select_Into': 'str'})
