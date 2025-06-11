@@ -104,6 +104,9 @@ class App(tk.Tk):
         messagebox.showinfo("Success", "Connection successful!")
         self.conn_str = conn_str
         os.environ["MSSQL_TARGET_CONN_STR"] = conn_str
+        db_name = self.entries["database"].get()
+        if db_name:
+            os.environ["MSSQL_TARGET_DB_NAME"] = db_name
         self.csv_dir = self.csv_dir_var.get()
         if self.csv_dir:
             os.environ["EJ_CSV_DIR"] = self.csv_dir

@@ -12,6 +12,7 @@ from tqdm import tqdm
 from sqlalchemy.types import Text
 import tkinter as tk
 from tkinter import messagebox
+from config import settings
 
 from utils.etl_helpers import (
     log_exception_to_file,
@@ -24,6 +25,11 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 DEFAULT_LOG_FILE = "PreDMSErrorLog_Justice.txt"
+
+# Determine the target database name from environment variables/connection
+# string. This value replaces the hard coded 'ELPaso_TX' references in the SQL
+# scripts so the ETL can run against any target database.
+DB_NAME = settings.MSSQL_TARGET_DB_NAME or settings._parse_database_name(settings.MSSQL_TARGET_CONN_STR)
 
 def parse_args():
     """Parse command line arguments for the Justice DB import script."""
@@ -115,12 +121,12 @@ def define_supervision_scope(conn, config):
     """Run SQL scripts to define supervision scope."""
     logger.info("Defining supervision scope...")
     steps = [
-        {'name': 'GatherCaseIDs', 'sql': load_sql('justice/gather_caseids.sql')},
-        {'name': 'GatherChargeIDs', 'sql': load_sql('justice/gather_chargeids.sql')},
-        {'name': 'GatherPartyIDs', 'sql': load_sql('justice/gather_partyids.sql')},
-        {'name': 'GatherWarrantIDs', 'sql': load_sql('justice/gather_warrantids.sql')},
-        {'name': 'GatherHearingIDs', 'sql': load_sql('justice/gather_hearingids.sql')},
-        {'name': 'GatherEventIDs', 'sql': load_sql('justice/gather_eventids.sql')}
+        {'name': 'GatherCaseIDs', 'sql': load_sql('justice/gather_caseids.sql', DB_NAME)},
+        {'name': 'GatherChargeIDs', 'sql': load_sql('justice/gather_chargeids.sql', DB_NAME)},
+        {'name': 'GatherPartyIDs', 'sql': load_sql('justice/gather_partyids.sql', DB_NAME)},
+        {'name': 'GatherWarrantIDs', 'sql': load_sql('justice/gather_warrantids.sql', DB_NAME)},
+        {'name': 'GatherHearingIDs', 'sql': load_sql('justice/gather_hearingids.sql', DB_NAME)},
+        {'name': 'GatherEventIDs', 'sql': load_sql('justice/gather_eventids.sql', DB_NAME)}
     ]
     
     for step in tqdm(steps, desc="SQL Script Progress", unit="step"):
@@ -131,7 +137,7 @@ def define_supervision_scope(conn, config):
 def prepare_drop_and_select(conn, config):
     """Prepare SQL statements for dropping and selecting data."""
     logger.info("Gathering list of Justice tables with SQL Commands to be migrated.")
-    additional_sql = load_sql('justice/gather_drops_and_selects.sql')
+    additional_sql = load_sql('justice/gather_drops_and_selects.sql', DB_NAME)
     run_sql_script(conn, 'gather_drops_and_selects', additional_sql, timeout=config['sql_timeout'])
 def import_joins(config, log_file):
     """Import JOIN statements from CSV to build selection queries."""
@@ -178,7 +184,7 @@ def import_joins(config, log_file):
 def update_joins_in_tables(conn, config):
     """Update the TablesToConvert table with JOINs."""
     logger.info("Updating JOINS in TablesToConvert List")
-    update_joins_sql = load_sql('justice/update_joins.sql')
+    update_joins_sql = load_sql('justice/update_joins.sql', DB_NAME)
     run_sql_script(conn, 'update_joins', update_joins_sql, timeout=config['sql_timeout'])
     logger.info("Updating JOINS for Justice tables is complete.")
 def execute_table_operations(conn, config, log_file):
@@ -186,11 +192,11 @@ def execute_table_operations(conn, config, log_file):
     logger.info("Executing table operations (DROP/SELECT)")
     
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT RowID, DatabaseName, SchemaName, TableName, fConvert, ScopeRowCount, 
-               Drop_IfExists, CAST(Select_Into AS VARCHAR(MAX)) + Joins AS [Select_Into] 
-        FROM ELPaso_TX.dbo.TablesToConvert S 
-        WHERE fConvert=1 
+    cursor.execute(f"""
+        SELECT RowID, DatabaseName, SchemaName, TableName, fConvert, ScopeRowCount,
+               Drop_IfExists, CAST(Select_Into AS VARCHAR(MAX)) + Joins AS [Select_Into]
+        FROM {DB_NAME}.dbo.TablesToConvert S
+        WHERE fConvert=1
         ORDER BY DatabaseName, SchemaName, TableName
     """)
     rows = cursor.fetchall()
@@ -234,26 +240,26 @@ def create_primary_keys(conn, config, log_file):
         return
     
     logger.info("Generating List of Primary Keys and NOT NULL Columns")
-    pk_sql = load_sql('justice/create_primarykeys.sql')
+    pk_sql = load_sql('justice/create_primarykeys.sql', DB_NAME)
     run_sql_script(conn, 'create_primarykeys', pk_sql, timeout=config['sql_timeout'])
     
     cursor = conn.cursor()
-    cursor.execute("""
+    cursor.execute(f"""
         WITH CTE_PKS AS (
-            SELECT 1 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script 
-            FROM ELPaso_TX.dbo.PrimaryKeyScripts S 
-            WHERE S.ScriptType='NOT_NULL' 
-            UNION 
-            SELECT 2 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script 
-            FROM ELPaso_TX.dbo.PrimaryKeyScripts S 
+            SELECT 1 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script
+            FROM {DB_NAME}.dbo.PrimaryKeyScripts S
+            WHERE S.ScriptType='NOT_NULL'
+            UNION
+            SELECT 2 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script
+            FROM {DB_NAME}.dbo.PrimaryKeyScripts S
             WHERE S.ScriptType='PK'
-        ) 
-        SELECT S.TYPEY, S.DatabaseName, S.SchemaName, S.TableName, 
-               REPLACE(S.Script, 'FLAG NOT NULL', 'BIT NOT NULL') AS [Script], TTC.fConvert 
-        FROM CTE_PKS S 
-        INNER JOIN ELPaso_TX.dbo.TablesToConvert TTC WITH (NOLOCK) 
-            ON S.SCHEMANAME=TTC.SchemaName AND S.TABLENAME=TTC.TableName 
-        WHERE TTC.fConvert=1 
+        )
+        SELECT S.TYPEY, S.DatabaseName, S.SchemaName, S.TableName,
+               REPLACE(S.Script, 'FLAG NOT NULL', 'BIT NOT NULL') AS [Script], TTC.fConvert
+        FROM CTE_PKS S
+        INNER JOIN {DB_NAME}.dbo.TablesToConvert TTC WITH (NOLOCK)
+            ON S.SCHEMANAME=TTC.SchemaName AND S.TABLENAME=TTC.TableName
+        WHERE TTC.fConvert=1
         ORDER BY S.SCHEMANAME, S.TABLENAME, S.TYPEY
     """)
     rows = cursor.fetchall()

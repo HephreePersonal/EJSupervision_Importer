@@ -12,6 +12,7 @@ from tqdm import tqdm
 from sqlalchemy.types import Text
 import tkinter as tk
 from tkinter import messagebox
+from config import settings
 
 from utils.etl_helpers import (
     log_exception_to_file,
@@ -24,6 +25,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 DEFAULT_LOG_FILE = "PreDMSErrorLog_LOBS.txt"
+
+# Database name used within the dynamic SQL statements
+DB_NAME = settings.MSSQL_TARGET_DB_NAME or settings._parse_database_name(settings.MSSQL_TARGET_CONN_STR)
 
 def parse_args():
     """Parse command line arguments for the LOB Column processing script."""
@@ -130,7 +134,7 @@ def build_alter_column_sql(schema, table, column, datatype, max_length):
 def create_lob_tracking_table(conn, config):
     """Create the table to track LOB column updates."""
     logger.info("Creating LOB_COLUMN_UPDATES tracking table")
-    gather_lobs_sql = load_sql('lob/gather_lobs.sql')
+    gather_lobs_sql = load_sql('lob/gather_lobs.sql', DB_NAME)
     run_sql_script(conn, 'gather_lobs', gather_lobs_sql, timeout=config['sql_timeout'])
     logger.info("LOB tracking table created successfully")
 
@@ -148,9 +152,9 @@ def gather_lob_columns(conn, config, log_file):
             CASE WHEN TYPE_NAME(c.user_type_id) IN ('varchar', 'nvarchar') 
                  THEN c.max_length ELSE NULL END AS CurrentLength,
             (SELECT COUNT(*) FROM sys.objects o WHERE o.object_id=t.object_id) AS RowCnt
-        FROM ELPaso_TX.sys.tables t 
-        INNER JOIN ELPaso_TX.sys.schemas s ON t.schema_id=s.schema_id 
-        INNER JOIN ELPaso_TX.sys.columns c ON t.object_id=c.object_id 
+        FROM {DB_NAME}.sys.tables t
+        INNER JOIN {DB_NAME}.sys.schemas s ON t.schema_id=s.schema_id
+        INNER JOIN {DB_NAME}.sys.columns c ON t.object_id=c.object_id
         WHERE t.[NAME] NOT IN (
             'SupContact','CaseEvent','TablesToConvert',
             'TablesToConvert_Financial','TablesToConvert_Operations'
@@ -183,8 +187,8 @@ def gather_lob_columns(conn, config, log_file):
             max_length = get_max_length(conn, schema_name, table_name, column_name, datatype, config['sql_timeout'])
             alter_column_sql = build_alter_column_sql(schema_name, table_name, column_name, datatype, max_length)
             
-            insert_sql = """
-                INSERT INTO ELPaso_TX.dbo.LOB_COLUMN_UPDATES
+            insert_sql = f"""
+                INSERT INTO {DB_NAME}.dbo.LOB_COLUMN_UPDATES
                 (SchemaName, TableName, ColumnName, DataType, CurrentLength, RowCnt, MaxLen, AlterStatement)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
@@ -218,10 +222,10 @@ def execute_lob_column_updates(conn, config, log_file):
     logger.info("Executing ALTER TABLE statements for LOB columns")
     
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT REPLACE(S.ALTERSTATEMENT,' NULL',';') AS Alter_Statement 
-        FROM ELPaso_TX.dbo.LOB_COLUMN_UPDATES S 
-        WHERE S.TABLENAME NOT LIKE '%LOB_COL%' 
+    cursor.execute(f"""
+        SELECT REPLACE(S.ALTERSTATEMENT,' NULL',';') AS Alter_Statement
+        FROM {DB_NAME}.dbo.LOB_COLUMN_UPDATES S
+        WHERE S.TABLENAME NOT LIKE '%LOB_COL%'
         ORDER BY S.MAXLEN DESC
     """, timeout=config['sql_timeout'])
     

@@ -12,6 +12,7 @@ from tqdm import tqdm
 from sqlalchemy.types import Text
 import tkinter as tk
 from tkinter import messagebox
+from config import settings
 
 from utils.etl_helpers import (
     log_exception_to_file,
@@ -24,6 +25,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 DEFAULT_LOG_FILE = "PreDMSErrorLog_Operations.txt"
+
+# Determine the target database name for replacing hard coded references.
+DB_NAME = settings.MSSQL_TARGET_DB_NAME or settings._parse_database_name(settings.MSSQL_TARGET_CONN_STR)
 
 def parse_args():
     """Parse command line arguments for the Operations DB import script."""
@@ -117,14 +121,14 @@ def load_config(config_file=None):
 def gather_document_ids(conn, config):
     """Gather list of DocumentIDs that are in scope for supervision."""
     logger.info("Gathering list of DocumentIDs that are in Scope for Supervision.")
-    gather_documents_sql = load_sql('operations/gather_documentids.sql')
+    gather_documents_sql = load_sql('operations/gather_documentids.sql', DB_NAME)
     run_sql_script(conn, 'gather_documentids', gather_documents_sql, timeout=config['sql_timeout'])
     logger.info("Document IDs gathered successfully.")
 
 def prepare_drop_and_select(conn, config):
     """Prepare SQL statements for dropping and selecting data."""
     logger.info("Gathering list of Operations tables with SQL Commands to be migrated.")
-    additional_sql = load_sql('operations/gather_drops_and_selects_operations.sql')
+    additional_sql = load_sql('operations/gather_drops_and_selects_operations.sql', DB_NAME)
     run_sql_script(
         conn, 
         'gather_drops_and_selects_Operations', 
@@ -178,7 +182,7 @@ def import_joins(config, log_file):
 def update_joins_in_tables(conn, config):
     """Update the TablesToConvert_Operations table with JOINs."""
     logger.info("Updating JOINS in TablesToConvert_Operations List")
-    update_joins_sql = load_sql('operations/update_joins_operations.sql')
+    update_joins_sql = load_sql('operations/update_joins_operations.sql', DB_NAME)
     run_sql_script(conn, 'update_joins_Operations', update_joins_sql, timeout=config['sql_timeout'])
     logger.info("Updating JOINS for Operations tables is complete.")
 
@@ -187,11 +191,11 @@ def execute_table_operations(conn, config, log_file):
     logger.info("Executing table operations (DROP/SELECT)")
     
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT RowID, DatabaseName, SchemaName, TableName, fConvert, ScopeRowCount, 
-               Drop_IfExists, CAST(Select_Into AS VARCHAR(MAX)) + Joins AS [Select_Into] 
-        FROM ELPaso_TX.dbo.TablesToConvert_Operations S 
-        WHERE fConvert=1 
+    cursor.execute(f"""
+        SELECT RowID, DatabaseName, SchemaName, TableName, fConvert, ScopeRowCount,
+               Drop_IfExists, CAST(Select_Into AS VARCHAR(MAX)) + Joins AS [Select_Into]
+        FROM {DB_NAME}.dbo.TablesToConvert_Operations S
+        WHERE fConvert=1
         ORDER BY DatabaseName, SchemaName, TableName
     """)
     rows = cursor.fetchall()
@@ -236,26 +240,26 @@ def create_primary_keys(conn, config, log_file):
         return
     
     logger.info("Generating List of Primary Keys and NOT NULL Columns for Operations Database")
-    pk_sql = load_sql('operations/create_primarykeys_operations.sql')
+    pk_sql = load_sql('operations/create_primarykeys_operations.sql', DB_NAME)
     run_sql_script(conn, 'create_primarykeys_Operations', pk_sql, timeout=config['sql_timeout'])
     
     cursor = conn.cursor()
-    cursor.execute("""
+    cursor.execute(f"""
         WITH CTE_PKS AS (
-            SELECT 1 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script 
-            FROM ELPaso_TX.dbo.PrimaryKeyScripts_Operations S 
-            WHERE S.ScriptType='NOT_NULL' 
-            UNION 
-            SELECT 2 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script 
-            FROM ELPaso_TX.dbo.PrimaryKeyScripts_Operations S 
+            SELECT 1 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script
+            FROM {DB_NAME}.dbo.PrimaryKeyScripts_Operations S
+            WHERE S.ScriptType='NOT_NULL'
+            UNION
+            SELECT 2 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script
+            FROM {DB_NAME}.dbo.PrimaryKeyScripts_Operations S
             WHERE S.ScriptType='PK'
-        ) 
-        SELECT S.TYPEY, S.DatabaseName, S.SchemaName, S.TableName, 
-               REPLACE(S.Script, 'FLAG NOT NULL', 'BIT NOT NULL') AS [Script], TTC.fConvert 
-        FROM CTE_PKS S 
-        INNER JOIN ELPaso_TX.dbo.TablesToConvert_Operations TTC WITH (NOLOCK) 
-            ON S.SCHEMANAME=TTC.SchemaName AND S.TABLENAME=TTC.TableName 
-        WHERE TTC.fConvert=1 
+        )
+        SELECT S.TYPEY, S.DatabaseName, S.SchemaName, S.TableName,
+               REPLACE(S.Script, 'FLAG NOT NULL', 'BIT NOT NULL') AS [Script], TTC.fConvert
+        FROM CTE_PKS S
+        INNER JOIN {DB_NAME}.dbo.TablesToConvert_Operations TTC WITH (NOLOCK)
+            ON S.SCHEMANAME=TTC.SchemaName AND S.TABLENAME=TTC.TableName
+        WHERE TTC.fConvert=1
         ORDER BY S.SCHEMANAME, S.TABLENAME, S.TYPEY
     """)
     rows = cursor.fetchall()

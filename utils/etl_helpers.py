@@ -12,8 +12,13 @@ def log_exception_to_file(error_details: str, log_path: str):
             f.write(error_details + "\n")
     except Exception as file_exc:
         logger.error(f"Failed to write to error log file: {file_exc}")
-def load_sql(filename: str) -> str:
-    """Load a SQL file from the sql_scripts directory."""
+def load_sql(filename: str, db_name: str | None = None) -> str:
+    """Load a SQL file from the sql_scripts directory.
+
+    If ``db_name`` is provided, occurrences of the hard coded ``ELPaso_TX``
+    database name are replaced with the supplied value so the scripts can run
+    against any target database.
+    """
     base_dir = os.path.dirname(os.path.dirname(__file__)) if '__file__' in globals() else os.getcwd()
     # The sql_scripts directory lives at the repo root
     sql_path = os.path.join(base_dir, 'sql_scripts', filename)
@@ -21,7 +26,10 @@ def load_sql(filename: str) -> str:
         logger.error(f"SQL file not found: {sql_path}")
         raise FileNotFoundError(f"SQL file not found: {sql_path}")
     with open(sql_path, 'r', encoding='utf-8') as f:
-        return f.read()
+        sql = f.read()
+    if db_name:
+        sql = sql.replace('ELPaso_TX', db_name).replace('ElPaso_TX', db_name)
+    return sql
 def run_sql_step(conn, name: str, sql: str):
     """Execute a single SQL statement and fetch any results."""
     logger.info(f"Starting step: {name}")
