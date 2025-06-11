@@ -43,12 +43,30 @@ def main():
         #The first thing we do is run a set of SQL Scripts that define Supervision Scope
         #Those would be 1.) Exists SupCaseHdr, Exists in ClkCaseHdr only for CaseIDs linked to SupCaseHdrIDs using xCaseBaseChrg (Only associated court records)
         steps = [
-            {'name': 'GatherCaseIDs', 'sql': load_sql('gather_caseids.sql')},
-            {'name': 'GatherChargeIDs', 'sql': load_sql('gather_chargeids.sql')},
-            {'name': 'GatherPartyIDs', 'sql': load_sql('gather_partyids.sql')},
-            {'name': 'GatherWarrantIDs', 'sql': load_sql('gather_warrantids.sql')},
-            {'name': 'GatherHearingIDs', 'sql': load_sql('gather_hearingids.sql')},
-            {'name': 'GatherEventIDs', 'sql': load_sql('gather_eventids.sql')}
+            {
+                'name': 'GatherCaseIDs',
+                'sql': load_sql('justice/gather_caseids.sql')
+            },
+            {
+                'name': 'GatherChargeIDs',
+                'sql': load_sql('justice/gather_chargeids.sql')
+            },
+            {
+                'name': 'GatherPartyIDs',
+                'sql': load_sql('justice/gather_partyids.sql')
+            },
+            {
+                'name': 'GatherWarrantIDs',
+                'sql': load_sql('justice/gather_warrantids.sql')
+            },
+            {
+                'name': 'GatherHearingIDs',
+                'sql': load_sql('justice/gather_hearingids.sql')
+            },
+            {
+                'name': 'GatherEventIDs',
+                'sql': load_sql('justice/gather_eventids.sql')
+            },
         ]
         target_conn = get_target_connection()
         for step in tqdm(steps, desc="SQL Script Progress", unit="step"):
@@ -58,7 +76,7 @@ def main():
 
         # After gather supervision scope we now need to create the appropriate sql commands to drop and INSERT Into the target database.
         logger.info("Gathering list of Justice tables with SQL Commands to me migrated.")
-        additional_sql = load_sql('gather_drops_and_selects.sql')  
+        additional_sql = load_sql('justice/gather_drops_and_selects.sql')
         run_sql_script(target_conn, 'gather_drops_and_selects', additional_sql)
 
         #Now we need to import the data from the csv file that contains all the appropriate joins for all Justice tables.
@@ -87,7 +105,7 @@ def main():
         )   
         #Now that we have our Joins we need to update the "TablesToConvert" table with them in order to build appropriate sql 
         logger.info("Updating JOINS in TablesToConvert List")
-        update_joins_sql = load_sql('update_joins.sql')  
+        update_joins_sql = load_sql('justice/update_joins.sql')
         run_sql_script(target_conn, 'update_joins', update_joins_sql)
         logger.info("Updating JOINS for Justice tables is complete.")
 
@@ -131,7 +149,7 @@ def main():
         cursor.close()
         logger.info("All Drop_IfExists and Select_Into statements executed for the JUSTICE Database")
         # Now that we are done with out SELECT INTO statements, we need to generate a list of Primary Keys and NOT Nullable Columns for each table.
-        pk_sql = load_sql('create_primarykeys.sql')  
+        pk_sql = load_sql('justice/create_primarykeys.sql')
         run_sql_script(target_conn, 'create_primarykeys', pk_sql)
         logger.info("Generating List of Primary Keys and NOT Nullable Columns")
 

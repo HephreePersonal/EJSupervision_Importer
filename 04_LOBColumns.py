@@ -68,7 +68,7 @@ def main():
         logger.info("Altering LOB Column Lengths based on Max")
         
         logger.info("Creating LOB_COLUMN_UPDATES")        
-        gather_lobs_sql = load_sql('gather_lobs.sql')
+        gather_lobs_sql = load_sql('lob/gather_lobs.sql')
         run_sql_script(target_conn, 'gather_lobs', gather_lobs_sql)
 
 

@@ -43,12 +43,12 @@ def main():
 
         # Gather List of FeeInstanceIDs to migrate, using the ParentTypes from ParentLinks, see "gather_documentids.sql"
         logger.info("Gathering list of FeeInstanceIDs that are in Scope for Supervision.")        
-        gather_feeinstances_sql = load_sql('gather_feeinstanceids.sql')
+        gather_feeinstances_sql = load_sql('financial/gather_feeinstanceids.sql')
         run_sql_script(target_conn, 'gather_feeinstanceids', gather_feeinstances_sql)
 
 
         logger.info("Gathering list of Financial tables with SQL Commands to me migrated.")
-        additional_sql = load_sql('gather_drops_and_selects_financial.sql')
+        additional_sql = load_sql('financial/gather_drops_and_selects_financial.sql')
         run_sql_script(target_conn, 'gather_drops_and_selects_Financial', additional_sql)
 
         # Import list of JOINS necessary to migrate each table in the Financial database.
@@ -75,7 +75,7 @@ def main():
             dtype={'Select_Into': Text(), 'Drop_IfExists': Text()}  
         )
         #Now we need to update the List of tables with the appropriate joins that we gathered from the csv file above.
-        update_joins_Financial_sql = load_sql('update_joins_financial.sql')
+        update_joins_Financial_sql = load_sql('financial/update_joins_financial.sql')
         run_sql_script(target_conn, 'update_joins_Financial', update_joins_Financial_sql)
         logger.info("Joins for Financial tables are updated")
         logger.info("Updating JOINS for Financial database is complete.")
@@ -120,7 +120,7 @@ def main():
         cursor.close()
         logger.info("All Drop_IfExists and Select_Into statements executed for Financial Database.")
         # Now that we are done with out SELECT INTO statements, we need to generate a list of Primary Keys and NOT Nullable Columns for each table.
-        pk_sql = load_sql('create_primarykeys_Financial.sql')  
+        pk_sql = load_sql('financial/create_primarykeys_financial.sql')
         run_sql_script(target_conn, 'create_primarykeys_Financial', pk_sql)
         logger.info("Generating List of Primary Keys and NOT Nullable Columns IN THE Financial DATABASE")
        # Now that we have our list, run through a cursor to execute each NOT NULL and Primary Key statement (in schema,table name order)
