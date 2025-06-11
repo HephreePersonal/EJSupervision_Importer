@@ -99,7 +99,7 @@ def main():
             dtype={'Select_Into': Text(), 'Drop_IfExists': Text()}  
         )
         #Now we need to update the List of tables with the appropriate joins that we gathered from the csv file above.
-        update_joins_Financial_sql = load_sql('update_joins_Operations.sql')  
+        update_joins_Financial_sql = load_sql('update_joins_financial.sql')
         run_sql_script(target_conn, 'update_joins_Financial', update_joins_Financial_sql)
         logger.info("Joins for Financial tables are updated")
         logger.info("Updating JOINS for Financial database is complete.")
