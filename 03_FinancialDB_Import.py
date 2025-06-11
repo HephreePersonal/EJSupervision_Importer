@@ -67,6 +67,7 @@ def run_sql_script(conn, name, sql):
 
 def main():
     load_dotenv()
+    include_empty = os.environ.get("INCLUDE_EMPTY_TABLES", "0") == "1"
     target_conn = get_target_connection()
 
     try:
@@ -115,7 +116,12 @@ def main():
             select_into_sql = row_dict.get('Select_Into')
             table_name = row_dict.get('TableName')
             schema_name = row_dict.get('SchemaName')
+            scope_row_count = row_dict.get('ScopeRowCount')
             full_table_name = f"{schema_name}.{table_name}"  # Concatenate schema and table
+
+            if not include_empty and (scope_row_count is None or int(scope_row_count) <= 0):
+                logger.info(f"Skipping Select INTO for {full_table_name}: scope_row_count is {scope_row_count}")
+                continue
 
             if drop_sql and drop_sql.strip():
                 logger.info(f"RowID: {idx} Drop If Exists: (Financial.{full_table_name})")

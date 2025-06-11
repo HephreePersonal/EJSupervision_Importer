@@ -92,6 +92,7 @@ def build_alter_column_sql(schema, table, column, datatype, max_length):
 
 def main():
     load_dotenv()
+    include_empty = os.environ.get("INCLUDE_EMPTY_TABLES", "0") == "1"
     target_conn = get_target_connection()
 
     try:
@@ -114,6 +115,11 @@ def main():
             table_name = row_dict.get('TableName')
             column_name = row_dict.get('ColumnName')
             datatype = row_dict.get('DataType')
+            row_cnt = row_dict.get('RowCnt')
+
+            if not include_empty and row_cnt is not None and int(row_cnt) <= 0:
+                logger.info(f"Skipping {schema_name}.{table_name}.{column_name}: row count is {row_cnt}")
+                continue
 
             max_length = get_max_length(target_conn, schema_name, table_name, column_name, datatype)
             alter_column_sql = build_alter_column_sql(schema_name, table_name, column_name, datatype, max_length)

@@ -67,6 +67,7 @@ def run_sql_script(conn, name, sql):
 
 def main():
     load_dotenv()
+    include_empty = os.environ.get("INCLUDE_EMPTY_TABLES", "0") == "1"
     target_conn = None
 
     try:
@@ -129,20 +130,20 @@ def main():
             scope_row_count = row_dict.get('ScopeRowCount')
             full_table_name = f"{schema_name}.{table_name}"  # Concatenate schema and table
 
-            # Always execute drop_sql if it exists
+            if not include_empty and (scope_row_count is None or int(scope_row_count) <= 0):
+                logger.info(f"Skipping Select INTO for {full_table_name}: scope_row_count is {scope_row_count}")
+                continue
+
             if drop_sql and drop_sql.strip():
                 logger.info(f"RowID:{idx} Drop If Exists:(Justice.{full_table_name})")
                 try:
                     cursor.execute(drop_sql)
                     target_conn.commit()
-                    
-                    # Execute select_into_sql only if scope_row_count > 0
-                    if select_into_sql and select_into_sql.strip() and scope_row_count is not None and int(scope_row_count) > 0:
+
+                    if select_into_sql and select_into_sql.strip():
                         logger.info(f"RowID:{idx} Select INTO:(Justice.{full_table_name})")
                         cursor.execute(select_into_sql)
                         target_conn.commit()
-                    elif scope_row_count is None or int(scope_row_count) <= 0:
-                        logger.info(f"Skipping Select INTO for {full_table_name}: scope_row_count is {scope_row_count}")
                         
                 except Exception as e:
                     logger.error(f"Error executing statements for row {idx} (Justice.{full_table_name}): {e}")
