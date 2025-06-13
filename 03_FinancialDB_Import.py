@@ -108,7 +108,7 @@ class FinancialDBImporter(BaseDBImporter):
     
     def get_next_step_name(self):
         """Return the name of the next step in the ETL process."""
-        return "LOB Column Processling"
+        return "LOB Column Processing"
 
 def main():
     """Main entry point for Financial DB Import."""
