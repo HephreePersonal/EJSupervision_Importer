@@ -230,7 +230,7 @@ class App(tk.Tk):
                 with open(CONFIG_FILE, 'r') as f:
                     return json.load(f)
         except Exception as e:
-            print(f"Error loading config: {e}")
+            logger.error(f"Error loading config: {e}")
         return {
             "driver": "",
             "server": "",
@@ -258,7 +258,7 @@ class App(tk.Tk):
             with open(CONFIG_FILE, 'w') as f:
                 json.dump(config, f, indent=2)
         except Exception as e:
-            print(f"Error saving config: {e}")
+            logger.error(f"Error saving config: {e}")
     
     def _create_connection_widgets(self):
         """Create entry fields for connection parameters and CSV directory."""
