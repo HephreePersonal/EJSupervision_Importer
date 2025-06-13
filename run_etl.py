@@ -325,7 +325,7 @@ class App(tk.Tk):
         tk.Label(self.script_frame, text="Current Status", font=("Arial", 10, "bold")).grid(row=0, column=2, sticky="w", padx=5, pady=2)
 
         self.run_buttons = {}
-        for idx, (label, path) in enumerate(sorted(SCRIPTS, key=lambda x: x[1]), 1):
+        for idx, (label, path) in enumerate(SCRIPTS, 1):
             tk.Label(self.script_frame, text=path).grid(row=idx, column=0, sticky="w", padx=5, pady=2)
             
             # Store button reference so we can disable/enable it

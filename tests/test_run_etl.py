@@ -82,3 +82,92 @@ def test_save_config_writes_absolute_path(tmp_path):
     with open(run_etl.CONFIG_FILE) as f:
         data = json.load(f)
     assert data["csv_dir"] == "/tmp/csv"
+
+
+def test_show_script_widgets_preserves_order(monkeypatch, tmp_path):
+    """Buttons should be created in the order defined by ``SCRIPTS``."""
+    # Build a minimal tkinter stub with the widget methods used by ``App``.
+    class DummyWidget:
+        def __init__(self, *a, **kw):
+            pass
+        def grid(self, *a, **kw):
+            pass
+        def pack(self, *a, **kw):
+            pass
+        def config(self, *a, **kw):
+            pass
+        def insert(self, *a, **kw):
+            pass
+        def get(self):
+            return ""
+        def delete(self, *a, **kw):
+            pass
+        def see(self, *a, **kw):
+            pass
+        def grid_rowconfigure(self, *a, **kw):
+            pass
+        def grid_columnconfigure(self, *a, **kw):
+            pass
+
+    class DummyEntry(DummyWidget):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self._val = ""
+        def insert(self, idx, val):
+            self._val = val
+        def get(self):
+            return self._val
+
+    class DummyVar:
+        def __init__(self, value=None):
+            self._v = value
+        def get(self):
+            return self._v
+        def set(self, val):
+            self._v = val
+
+    class DummyTk(DummyWidget):
+        def title(self, *a, **k):
+            pass
+        def resizable(self, *a, **k):
+            pass
+        def minsize(self, *a, **k):
+            pass
+        def after(self, *a, **k):
+            pass
+
+    class DummyScrolled(DummyWidget):
+        pass
+
+    tk = types.SimpleNamespace(
+        Tk=DummyTk,
+        Label=DummyWidget,
+        Entry=DummyEntry,
+        Button=DummyWidget,
+        Checkbutton=DummyWidget,
+        Frame=DummyWidget,
+        BooleanVar=DummyVar,
+        StringVar=DummyVar,
+        scrolledtext=types.SimpleNamespace(ScrolledText=DummyScrolled),
+        filedialog=types.SimpleNamespace(askdirectory=lambda: ""),
+        messagebox=types.SimpleNamespace(showerror=lambda *a, **k: None,
+                                         showinfo=lambda *a, **k: None),
+        END=None,
+        WORD=None,
+        LEFT=None,
+    )
+
+    monkeypatch.setitem(sys.modules, "tkinter", tk)
+    monkeypatch.setitem(sys.modules, "tkinter.filedialog", tk.filedialog)
+    monkeypatch.setitem(sys.modules, "tkinter.messagebox", tk.messagebox)
+    monkeypatch.setitem(sys.modules, "tkinter.scrolledtext", tk.scrolledtext)
+
+    monkeypatch.setitem(sys.modules, "pyodbc",
+                        types.SimpleNamespace(Error=Exception,
+                                             connect=lambda *a, **k: None))
+
+    run_etl = _import_run_etl_from_repo(tmp_path)
+    app = run_etl.App()
+    app._show_script_widgets()
+
+    assert list(app.run_buttons.keys()) == [p for _, p in run_etl.SCRIPTS]
