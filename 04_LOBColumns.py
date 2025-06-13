@@ -13,7 +13,7 @@ from tqdm import tqdm
 from sqlalchemy.types import Text
 import tkinter as tk
 from tkinter import messagebox
-from config import settings
+from config import settings, ETLConstants
 
 from utils.etl_helpers import (
     log_exception_to_file,
@@ -92,8 +92,8 @@ def load_config(config_file=None):
     config = {
         "include_empty_tables": False,
         "log_filename": DEFAULT_LOG_FILE,
-        "sql_timeout": 300,  # seconds
-        "batch_size": 100,
+        "sql_timeout": ETLConstants.DEFAULT_SQL_TIMEOUT,  # seconds
+        "batch_size": ETLConstants.DEFAULT_BULK_INSERT_BATCH_SIZE,
     }
     
     if config_file and os.path.exists(config_file):
@@ -107,7 +107,14 @@ def load_config(config_file=None):
     
     return config
 
-def get_max_length(conn, schema, table, column, datatype, timeout=300):
+def get_max_length(
+    conn,
+    schema,
+    table,
+    column,
+    datatype,
+    timeout=ETLConstants.DEFAULT_SQL_TIMEOUT,
+):
     """Determine the maximum length needed for a text/varchar column."""
     with conn.cursor() as cursor:
         try:
@@ -172,7 +179,9 @@ def gather_lob_columns(conn, config, log_file):
 
         columns = [desc[0] for desc in cursor.description]
 
-        batch_size = config.get('batch_size', 100)
+        batch_size = config.get(
+            'batch_size', ETLConstants.DEFAULT_BULK_INSERT_BATCH_SIZE
+        )
         processed = 0
         progress = tqdm(desc="Analyzing LOB Columns", unit="column")
 

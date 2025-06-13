@@ -6,6 +6,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from tqdm import tqdm
+from config import ETLConstants
 
 _IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
@@ -25,7 +26,11 @@ class Settings:
     ej_csv_dir: str = field(default_factory=lambda: os.getenv("EJ_CSV_DIR"))
     ej_log_dir: str = field(default_factory=lambda: os.getenv("EJ_LOG_DIR", os.getcwd()))
     include_empty_tables: bool = field(default_factory=lambda: os.getenv("INCLUDE_EMPTY_TABLES", "0") == "1")
-    sql_timeout: int = field(default_factory=lambda: int(os.getenv("SQL_TIMEOUT", "300")))
+    sql_timeout: int = field(
+        default_factory=lambda: int(
+            os.getenv("SQL_TIMEOUT", str(ETLConstants.DEFAULT_SQL_TIMEOUT))
+        )
+    )
 
     def __post_init__(self) -> None:
         missing = []

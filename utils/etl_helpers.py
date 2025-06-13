@@ -4,8 +4,7 @@ import os
 import time
 from typing import Optional, Any, List
 
-# Maximum number of attempts for retryable SQL operations
-MAX_RETRY_ATTEMPTS = 3
+from config import ETLConstants
 
 class ETLError(Exception):
     """Base exception for ETL operations."""
@@ -61,7 +60,9 @@ def load_sql(filename: str, db_name: Optional[str] = None) -> str:
         logger.debug(f"Replaced database name in {filename} with {db_name}")
     
     return sql
-def run_sql_step(conn, name: str, sql: str, timeout: int = 300) -> Optional[List[Any]]:
+def run_sql_step(
+    conn, name: str, sql: str, timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT
+) -> Optional[List[Any]]:
     """Execute a single SQL statement and fetch any results.
     
     Args:
@@ -104,8 +105,8 @@ def run_sql_step_with_retry(
     conn,
     name: str,
     sql: str,
-    timeout: int = 300,
-    max_retries: int = MAX_RETRY_ATTEMPTS,
+    timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT,
+    max_retries: int = ETLConstants.MAX_RETRY_ATTEMPTS,
 ) -> Optional[List[Any]]:
     """Execute a SQL step with retry logic for transient ``pyodbc.Error`` failures."""
 
@@ -127,7 +128,9 @@ def run_sql_step_with_retry(
                 )
 
             time.sleep(2**attempt)
-def run_sql_script(conn, name: str, sql: str, timeout: int = 300):
+def run_sql_script(
+    conn, name: str, sql: str, timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT
+):
     """Execute a multi-statement SQL script.
     
     Args:
@@ -174,7 +177,12 @@ def run_sql_script(conn, name: str, sql: str, timeout: int = 300):
         logger.info(f"Script {name} failed after {elapsed:.2f} seconds")
         record_failure()
         raise SQLExecutionError(sql, e, table_name=name)
-def execute_sql_with_timeout(conn, sql: str, params: Optional[tuple] = None, timeout: int = 300) -> Any:
+def execute_sql_with_timeout(
+    conn,
+    sql: str,
+    params: Optional[tuple] = None,
+    timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT,
+) -> Any:
     """Execute SQL with parameters and timeout.
     
     Args:

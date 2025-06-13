@@ -8,6 +8,12 @@ if "pyodbc" not in sys.modules:
         Error=_DummyError, connect=lambda *a, **k: None
     )
 
+if "dotenv" not in sys.modules:
+    mod = types.ModuleType("dotenv")
+    mod.load_dotenv = lambda *a, **k: None
+    sys.modules["dotenv"] = mod
+
+from config import ETLConstants
 from utils.etl_helpers import (
     run_sql_step,
     run_sql_script,
@@ -81,5 +87,7 @@ def test_run_sql_step_with_retry_success():
 
 def test_run_sql_step_with_retry_retries(monkeypatch):
     conn = DummyConn(fail_times=2)
-    result = run_sql_step_with_retry(conn, 'test', 'SELECT 1', max_retries=3)
+    result = run_sql_step_with_retry(
+        conn, 'test', 'SELECT 1', max_retries=ETLConstants.MAX_RETRY_ATTEMPTS
+    )
     assert result == [('row',)]
