@@ -18,7 +18,7 @@ from config import settings
 from utils.etl_helpers import (
     log_exception_to_file,
     load_sql,
-    run_sql_step,
+    run_sql_step_with_retry,
     run_sql_script,
 )
 
@@ -250,7 +250,12 @@ def execute_lob_column_updates(conn, config, log_file):
 
             if alter_sql:
                 try:
-                    run_sql_step(conn, f"Alter Column {idx}", alter_sql, timeout=config['sql_timeout'])
+                    run_sql_step_with_retry(
+                        conn,
+                        f"Alter Column {idx}",
+                        alter_sql,
+                        timeout=config['sql_timeout'],
+                    )
                     conn.commit()
                 except Exception as e:
                     error_msg = f"Failed to alter column (statement {idx}): {e}"

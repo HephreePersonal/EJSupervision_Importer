@@ -10,7 +10,12 @@ import sqlalchemy
 from sqlalchemy.types import Text
 
 from db.mssql import get_target_connection
-from utils.etl_helpers import load_sql, run_sql_script, log_exception_to_file
+from utils.etl_helpers import (
+    load_sql,
+    run_sql_script,
+    log_exception_to_file,
+    run_sql_step_with_retry,
+)
 from etl.core import (
     sanitize_sql,
     safe_tqdm,
@@ -192,13 +197,23 @@ class BaseDBImporter:
                             f"RowID:{idx} Drop If Exists:({self.DB_TYPE}.{full_table_name})"
                         )
                         try:
-                            cursor.execute("EXEC sp_executesql ?", (drop_sql,))
+                            run_sql_step_with_retry(
+                                conn,
+                                f"Drop {full_table_name}",
+                                drop_sql,
+                                timeout=self.config['sql_timeout'],
+                            )
 
                             if select_into_sql.strip():
                                 logger.info(
                                     f"RowID:{idx} Select INTO:({self.DB_TYPE}.{full_table_name})"
                                 )
-                                cursor.execute("EXEC sp_executesql ?", (select_into_sql,))
+                                run_sql_step_with_retry(
+                                    conn,
+                                    f"SelectInto {full_table_name}",
+                                    select_into_sql,
+                                    timeout=self.config['sql_timeout'],
+                                )
 
                             conn.commit()
                             successful_tables += 1
@@ -288,11 +303,18 @@ class BaseDBImporter:
                 logger.info(f"Executing Primary Key/NOT NULL for row {idx} ({self.DB_TYPE}.{full_table_name})")
                 if (scope_row_count != 0 or scope_row_count is not None) or self.config['include_empty_tables']:
                     try:
-                        cursor.execute("EXEC sp_executesql ?", (createpk_sql,))
+                        run_sql_step_with_retry(
+                            conn,
+                            f"PK {full_table_name}",
+                            createpk_sql,
+                            timeout=self.config['sql_timeout'],
+                        )
                         conn.commit()
                     except Exception as e:
                         conn.rollback()
-                        error_msg = f"Error executing PK statements for row {idx} ({self.DB_TYPE}.{full_table_name}): {e}"
+                        error_msg = (
+                            f"Error executing PK statements for row {idx} ({self.DB_TYPE}.{full_table_name}): {e}"
+                        )
                         logger.error(error_msg)
                         log_exception_to_file(error_msg, log_file)
 
