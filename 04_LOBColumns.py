@@ -103,24 +103,22 @@ def load_config(config_file=None):
 
 def get_max_length(conn, schema, table, column, datatype, timeout=300):
     """Determine the maximum length needed for a text/varchar column."""
-    cursor = conn.cursor()
-    try:
-        if datatype.lower() in ('varchar', 'nvarchar'):
-            sql = f"SELECT MAX(LEN([{column}])) FROM [{schema}].[{table}]"
-        elif datatype.lower() in ('text', 'ntext'):
-            # For text/ntext, cast to nvarchar(max) for LEN
-            sql = f"SELECT MAX(LEN(CAST([{column}] AS NVARCHAR(MAX)))) FROM [{schema}].[{table}]"
-        else:
+    with conn.cursor() as cursor:
+        try:
+            if datatype.lower() in ('varchar', 'nvarchar'):
+                sql = f"SELECT MAX(LEN([{column}])) FROM [{schema}].[{table}]"
+            elif datatype.lower() in ('text', 'ntext'):
+                # For text/ntext, cast to nvarchar(max) for LEN
+                sql = f"SELECT MAX(LEN(CAST([{column}] AS NVARCHAR(MAX)))) FROM [{schema}].[{table}]"
+            else:
+                return None
+
+            cursor.execute(sql, timeout=timeout)
+            result = cursor.fetchone()
+            return result[0] if result and result[0] is not None else 0
+        except Exception as e:
+            logger.error(f"Error getting max length for {schema}.{table}.{column}: {e}")
             return None
-        
-        cursor.execute(sql, timeout=timeout)
-        result = cursor.fetchone()
-        return result[0] if result and result[0] is not None else 0
-    except Exception as e:
-        logger.error(f"Error getting max length for {schema}.{table}.{column}: {e}")
-        return None
-    finally:
-        cursor.close()
 
 def build_alter_column_sql(schema, table, column, datatype, max_length):
     """Build the SQL statement to alter a column based on its max length."""
@@ -142,9 +140,9 @@ def gather_lob_columns(conn, config, log_file):
     """Gather information about LOB columns and determine optimal sizes."""
     logger.info("Gathering information about LOB columns")
     
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT 
+    with conn.cursor() as cursor:
+        cursor.execute("""
+        SELECT
             s.[NAME] AS SchemaName,
             t.[NAME] AS TableName,
             c.[NAME] AS ColumnName,
@@ -164,87 +162,84 @@ def gather_lob_columns(conn, config, log_file):
                 AND (c.max_length > 5000 OR c.max_length=-1))
         )
         ORDER BY s.[NAME], t.[NAME], c.[NAME]
-    """, timeout=config['sql_timeout'])
-    
-    rows = cursor.fetchall()
-    columns = [desc[0] for desc in cursor.description]
+        """, timeout=config['sql_timeout'])
 
-    update_cursor = conn.cursor()
-    for idx, row in enumerate(tqdm(rows, desc="Analyzing LOB Columns", unit="column"), 1):
-        row_dict = dict(zip(columns, row))
-        schema_name = row_dict.get('SchemaName')
-        table_name = row_dict.get('TableName')
-        column_name = row_dict.get('ColumnName')
-        datatype = row_dict.get('DataType')
-        row_cnt = row_dict.get('RowCnt') or 0
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
 
-        if not config['include_empty_tables'] and row_cnt <= 0:
-            logger.info(f"Skipping {schema_name}.{table_name}.{column_name}: row count is {row_cnt}")
-            continue
+        with conn.cursor() as update_cursor:
+            for idx, row in enumerate(tqdm(rows, desc="Analyzing LOB Columns", unit="column"), 1):
+                row_dict = dict(zip(columns, row))
+                schema_name = row_dict.get('SchemaName')
+                table_name = row_dict.get('TableName')
+                column_name = row_dict.get('ColumnName')
+                datatype = row_dict.get('DataType')
+                row_cnt = row_dict.get('RowCnt') or 0
 
-        try:
-            max_length = get_max_length(conn, schema_name, table_name, column_name, datatype, config['sql_timeout'])
-            alter_column_sql = build_alter_column_sql(schema_name, table_name, column_name, datatype, max_length)
-            
-            insert_sql = f"""
-                INSERT INTO {DB_NAME}.dbo.LOB_COLUMN_UPDATES
-                (SchemaName, TableName, ColumnName, DataType, CurrentLength, RowCnt, MaxLen, AlterStatement)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """
-            update_cursor.execute(
-                insert_sql,
-                (
-                    schema_name,
-                    table_name,
-                    column_name,
-                    datatype,
-                    row_dict.get('CurrentLength'),
-                    row_cnt,
-                    max_length,
-                    alter_column_sql
-                ),
-                timeout=config['sql_timeout']
-            )
-            conn.commit()
-            
-        except Exception as e:
-            error_msg = f"Error processing LOB column {schema_name}.{table_name}.{column_name}: {e}"
-            logger.error(error_msg)
-            log_exception_to_file(error_msg, log_file)
-    
-    update_cursor.close()
-    cursor.close()
-    logger.info(f"Analyzed and cataloged {len(rows)} LOB columns")
+                if not config['include_empty_tables'] and row_cnt <= 0:
+                    logger.info(f"Skipping {schema_name}.{table_name}.{column_name}: row count is {row_cnt}")
+                    continue
+
+                try:
+                    max_length = get_max_length(conn, schema_name, table_name, column_name, datatype, config['sql_timeout'])
+                    alter_column_sql = build_alter_column_sql(schema_name, table_name, column_name, datatype, max_length)
+
+                    insert_sql = f"""
+                        INSERT INTO {DB_NAME}.dbo.LOB_COLUMN_UPDATES
+                        (SchemaName, TableName, ColumnName, DataType, CurrentLength, RowCnt, MaxLen, AlterStatement)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """
+                    update_cursor.execute(
+                        insert_sql,
+                        (
+                            schema_name,
+                            table_name,
+                            column_name,
+                            datatype,
+                            row_dict.get('CurrentLength'),
+                            row_cnt,
+                            max_length,
+                            alter_column_sql
+                        ),
+                        timeout=config['sql_timeout']
+                    )
+                    conn.commit()
+
+                except Exception as e:
+                    error_msg = f"Error processing LOB column {schema_name}.{table_name}.{column_name}: {e}"
+                    logger.error(error_msg)
+                    log_exception_to_file(error_msg, log_file)
+
+            logger.info(f"Analyzed and cataloged {len(rows)} LOB columns")
 
 def execute_lob_column_updates(conn, config, log_file):
     """Execute the ALTER statements to optimize LOB columns."""
     logger.info("Executing ALTER TABLE statements for LOB columns")
     
-    cursor = conn.cursor()
-    cursor.execute(f"""
+    with conn.cursor() as cursor:
+        cursor.execute(f"""
         SELECT REPLACE(S.ALTERSTATEMENT,' NULL',';') AS Alter_Statement
         FROM {DB_NAME}.dbo.LOB_COLUMN_UPDATES S
         WHERE S.TABLENAME NOT LIKE '%LOB_COL%'
         ORDER BY S.MAXLEN DESC
     """, timeout=config['sql_timeout'])
-    
-    rows = cursor.fetchall()
-    columns = [desc[0] for desc in cursor.description]
 
-    for idx, row in enumerate(tqdm(rows, desc="Optimizing LOB Columns", unit="column"), 1):
-        row_dict = dict(zip(columns, row))
-        alter_sql = row_dict.get('Alter_Statement')
-        
-        if alter_sql:
-            try:
-                run_sql_step(conn, f"Alter Column {idx}", alter_sql, timeout=config['sql_timeout'])
-                conn.commit()
-            except Exception as e:
-                error_msg = f"Failed to alter column (statement {idx}): {e}"
-                logger.error(error_msg)
-                log_exception_to_file(error_msg, log_file)
-    
-    cursor.close()
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+
+        for idx, row in enumerate(tqdm(rows, desc="Optimizing LOB Columns", unit="column"), 1):
+            row_dict = dict(zip(columns, row))
+            alter_sql = row_dict.get('Alter_Statement')
+
+            if alter_sql:
+                try:
+                    run_sql_step(conn, f"Alter Column {idx}", alter_sql, timeout=config['sql_timeout'])
+                    conn.commit()
+                except Exception as e:
+                    error_msg = f"Failed to alter column (statement {idx}): {e}"
+                    logger.error(error_msg)
+                    log_exception_to_file(error_msg, log_file)
+
     logger.info(f"Completed optimizing {len(rows)} LOB columns")
 
 def show_completion_message():
