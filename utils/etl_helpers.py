@@ -1,4 +1,5 @@
 import logging
+from utils.logging_helper import record_success, record_failure
 import os
 import time
 from typing import Optional, Any, List
@@ -86,9 +87,13 @@ def run_sql_step(conn, name: str, sql: str, timeout: int = 300) -> Optional[List
 
         elapsed = time.time() - start_time
         logger.info(f"Completed step: {name} in {elapsed:.2f} seconds")
+        record_success()
         return results
     except Exception as e:
+        elapsed = time.time() - start_time
         logger.error(f"Error executing step {name}: {e}. SQL: {sql}")
+        logger.info(f"Step {name} failed after {elapsed:.2f} seconds")
+        record_failure()
         raise SQLExecutionError(sql, e, table_name=name)
 def run_sql_script(conn, name: str, sql: str, timeout: int = 300):
     """Execute a multi-statement SQL script.
@@ -128,10 +133,14 @@ def run_sql_script(conn, name: str, sql: str, timeout: int = 300):
         logger.info(
             f"Completed script: {name} - executed {total_statements} statements in {elapsed:.2f} seconds"
         )
+        record_success()
     except SQLExecutionError:
         raise
     except Exception as e:
+        elapsed = time.time() - start_time
         logger.error(f"Error in script {name}: {e}")
+        logger.info(f"Script {name} failed after {elapsed:.2f} seconds")
+        record_failure()
         raise SQLExecutionError(sql, e, table_name=name)
 def execute_sql_with_timeout(conn, sql: str, params: Optional[tuple] = None, timeout: int = 300) -> Any:
     """Execute SQL with parameters and timeout.
@@ -145,6 +154,7 @@ def execute_sql_with_timeout(conn, sql: str, params: Optional[tuple] = None, tim
     Returns:
         Cursor after execution
     """
+    start_time = time.time()
     with conn.cursor() as cursor:
         try:
             # Set the query timeout
@@ -155,7 +165,12 @@ def execute_sql_with_timeout(conn, sql: str, params: Optional[tuple] = None, tim
             else:
                 cursor.execute(sql)
 
+            record_success()
             return cursor
         except Exception as e:
             logger.error(f"Error executing SQL: {e}. SQL: {sql}")
+            record_failure()
             raise SQLExecutionError(sql, e)
+        finally:
+            elapsed = time.time() - start_time
+            logger.debug(f"SQL executed in {elapsed:.2f} seconds")

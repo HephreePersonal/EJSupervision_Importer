@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import logging
+from utils.logging_helper import setup_logging, operation_counts
 logger = logging.getLogger(__name__)
 import subprocess
 import tkinter as tk
@@ -483,5 +484,6 @@ class App(tk.Tk):
         super().destroy()
 
 if __name__ == "__main__":
+    setup_logging()
     app = App()
     app.mainloop()

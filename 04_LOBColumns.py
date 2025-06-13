@@ -1,4 +1,5 @@
 import logging
+from utils.logging_helper import setup_logging, operation_counts
 import time
 import json
 import os
@@ -22,7 +23,6 @@ from utils.etl_helpers import (
 )
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 DEFAULT_LOG_FILE = "PreDMSErrorLog_LOBS.txt"
 
@@ -276,6 +276,7 @@ def main():
     try:
         # Initialize configuration
         args = parse_args()
+        setup_logging()
         load_dotenv()
         validate_environment()
         
@@ -322,6 +323,11 @@ def main():
                 
                 # Step 4: Show completion message
                 show_completion_message()
+                logger.info(
+                    "Run completed - successes: %s failures: %s",
+                    operation_counts["success"],
+                    operation_counts["failure"],
+                )
                 
         except Exception as e:
             logger.exception("Unexpected error during database operations")
