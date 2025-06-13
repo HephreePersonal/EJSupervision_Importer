@@ -6,6 +6,8 @@ import re
 import unicodedata
 from tqdm import tqdm
 
+_IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
 logger = logging.getLogger(__name__)
 
 def validate_environment(required_vars, optional_vars):
@@ -101,3 +103,26 @@ def safe_tqdm(iterable, **kwargs):
         print(f"Progress bar disabled: {kwargs.get('desc', 'Processing')}")
         for item in iterable:
             yield item
+
+
+def validate_sql_identifier(identifier: str) -> str:
+    """Validate a string for use as a SQL identifier.
+
+    Only allows alphanumeric characters and underscores and must not start with a digit.
+
+    Args:
+        identifier: The identifier to validate.
+
+    Returns:
+        The original identifier if valid.
+
+    Raises:
+        ValueError: If the identifier is invalid.
+    """
+    if not isinstance(identifier, str):
+        raise ValueError("Identifier must be a string")
+
+    if not _IDENTIFIER_RE.match(identifier):
+        raise ValueError(f"Invalid SQL identifier: {identifier}")
+
+    return identifier
