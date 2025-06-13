@@ -4,6 +4,9 @@ import os
 import time
 from typing import Optional, Any, List
 
+# Maximum number of attempts for retryable SQL operations
+MAX_RETRY_ATTEMPTS = 3
+
 class ETLError(Exception):
     """Base exception for ETL operations."""
 
@@ -95,6 +98,35 @@ def run_sql_step(conn, name: str, sql: str, timeout: int = 300) -> Optional[List
         logger.info(f"Step {name} failed after {elapsed:.2f} seconds")
         record_failure()
         raise SQLExecutionError(sql, e, table_name=name)
+
+
+def run_sql_step_with_retry(
+    conn,
+    name: str,
+    sql: str,
+    timeout: int = 300,
+    max_retries: int = MAX_RETRY_ATTEMPTS,
+) -> Optional[List[Any]]:
+    """Execute a SQL step with retry logic for transient ``pyodbc.Error`` failures."""
+
+    for attempt in range(max_retries):
+        try:
+            return run_sql_step(conn, name, sql, timeout)
+        except SQLExecutionError as exc:
+            import pyodbc  # Imported lazily for tests that stub this module
+
+            if not isinstance(exc.original_error, pyodbc.Error):
+                raise
+
+            if attempt == max_retries - 1:
+                raise
+
+            if "timeout" in str(exc.original_error).lower():
+                logger.warning(
+                    f"Timeout on attempt {attempt + 1} for {name}, retrying..."
+                )
+
+            time.sleep(2**attempt)
 def run_sql_script(conn, name: str, sql: str, timeout: int = 300):
     """Execute a multi-statement SQL script.
     
