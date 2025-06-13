@@ -135,6 +135,8 @@ class BaseDBImporter:
         log_file = self.config['log_file']
         
         cursor = conn.cursor()
+        original_autocommit = conn.autocommit
+        conn.autocommit = False
         table_name = f"TablesToConvert_{self.DB_TYPE}" if self.DB_TYPE != 'Justice' else 'TablesToConvert'
         table_name = validate_sql_identifier(table_name)
         
@@ -191,17 +193,18 @@ class BaseDBImporter:
                         )
                         try:
                             cursor.execute("EXEC sp_executesql ?", (drop_sql,))
-                            conn.commit()
 
                             if select_into_sql.strip():
                                 logger.info(
                                     f"RowID:{idx} Select INTO:({self.DB_TYPE}.{full_table_name})"
                                 )
                                 cursor.execute("EXEC sp_executesql ?", (select_into_sql,))
-                                conn.commit()
-                                successful_tables += 1
-                                
+
+                            conn.commit()
+                            successful_tables += 1
+
                         except Exception as sql_error:
+                            conn.rollback()
                             error_msg = f"SQL execution error for row {idx} ({full_table_name}): {str(sql_error)}"
                             logger.error(error_msg)
                             log_exception_to_file(error_msg, log_file)
@@ -222,6 +225,7 @@ class BaseDBImporter:
             raise
         finally:
             cursor.close()
+            conn.autocommit = original_autocommit
             
         logger.info(f"Table operations completed: {successful_tables} successful, {failed_tables} failed")
 
@@ -248,6 +252,8 @@ class BaseDBImporter:
         run_sql_script(conn, pk_script_name, pk_sql, timeout=self.config['sql_timeout'])
         
         cursor = conn.cursor()
+        pk_original_autocommit = conn.autocommit
+        conn.autocommit = False
         db_name = validate_sql_identifier(self.db_name)
         cursor.execute(
             f"""
@@ -281,16 +287,18 @@ class BaseDBImporter:
             full_table_name = f"{schema_name}.{table_name}"
             
             logger.info(f"Executing Primary Key/NOT NULL for row {idx} ({self.DB_TYPE}.{full_table_name})")
-            if (scope_row_count != 0 or scope_row_count is not None) or self.config['include_empty_tables']:       
+            if (scope_row_count != 0 or scope_row_count is not None) or self.config['include_empty_tables']:
                 try:
                     cursor.execute("EXEC sp_executesql ?", (createpk_sql,))
                     conn.commit()
                 except Exception as e:
+                    conn.rollback()
                     error_msg = f"Error executing PK statements for row {idx} ({self.DB_TYPE}.{full_table_name}): {e}"
                     logger.error(error_msg)
                     log_exception_to_file(error_msg, log_file)
         
         cursor.close()
+        conn.autocommit = pk_original_autocommit
         logger.info(f"All Primary Key/NOT NULL statements executed FOR THE {self.DB_TYPE} DATABASE.")
 
     def show_completion_message(self, next_step_name=None):
