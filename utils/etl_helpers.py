@@ -58,19 +58,18 @@ def run_sql_step(conn, name: str, sql: str, timeout: int = 300) -> Optional[List
     logger.info(f"Starting step: {name}")
     start_time = time.time()
     try:
-        cursor = conn.cursor()
-        # Set the query timeout
-        cursor.execute(f"SET LOCK_TIMEOUT {timeout * 1000}")  # Convert to milliseconds
-        cursor.execute(sql)
-        
-        try:
-            results = cursor.fetchall()
-            logger.info(f"{name}: Retrieved {len(results)} rows")
-        except Exception:
-            results = None
-            logger.info(f"{name}: Statement executed (no results to fetch)")
-        
-        cursor.close()
+        with conn.cursor() as cursor:
+            # Set the query timeout
+            cursor.execute(f"SET LOCK_TIMEOUT {timeout * 1000}")  # Convert to milliseconds
+            cursor.execute(sql)
+
+            try:
+                results = cursor.fetchall()
+                logger.info(f"{name}: Retrieved {len(results)} rows")
+            except Exception:
+                results = None
+                logger.info(f"{name}: Statement executed (no results to fetch)")
+
         elapsed = time.time() - start_time
         logger.info(f"Completed step: {name} in {elapsed:.2f} seconds")
         return results
@@ -89,25 +88,24 @@ def run_sql_script(conn, name: str, sql: str, timeout: int = 300):
     logger.info(f"Starting script: {name}")
     start_time = time.time()
     try:
-        cursor = conn.cursor()
-        # Set the query timeout
-        cursor.execute(f"SET LOCK_TIMEOUT {timeout * 1000}")  # Convert to milliseconds
-        
-        # Split by GO statements as well as semicolons for SQL Server
-        # This handles scripts that use GO as a batch separator
-        sql_batches = sql.split('\nGO\n') if '\nGO\n' in sql else [sql]
-        
-        total_statements = 0
-        for batch in sql_batches:
-            statements = [stmt.strip() for stmt in batch.split(';') if stmt.strip()]
-            for stmt in statements:
-                # Skip comments and empty statements
-                if stmt and not stmt.strip().startswith('--'):
-                    cursor.execute(stmt)
-                    conn.commit()
-                    total_statements += 1
-        
-        cursor.close()
+        with conn.cursor() as cursor:
+            # Set the query timeout
+            cursor.execute(f"SET LOCK_TIMEOUT {timeout * 1000}")  # Convert to milliseconds
+
+            # Split by GO statements as well as semicolons for SQL Server
+            # This handles scripts that use GO as a batch separator
+            sql_batches = sql.split('\nGO\n') if '\nGO\n' in sql else [sql]
+
+            total_statements = 0
+            for batch in sql_batches:
+                statements = [stmt.strip() for stmt in batch.split(';') if stmt.strip()]
+                for stmt in statements:
+                    # Skip comments and empty statements
+                    if stmt and not stmt.strip().startswith('--'):
+                        cursor.execute(stmt)
+                        conn.commit()
+                        total_statements += 1
+
         elapsed = time.time() - start_time
         logger.info(f"Completed script: {name} - executed {total_statements} statements in {elapsed:.2f} seconds")
     except Exception as e:
@@ -125,17 +123,16 @@ def execute_sql_with_timeout(conn, sql: str, params: Optional[tuple] = None, tim
     Returns:
         Cursor after execution
     """
-    cursor = conn.cursor()
-    try:
-        # Set the query timeout
-        cursor.execute(f"SET LOCK_TIMEOUT {timeout * 1000}")  # Convert to milliseconds
-        
-        if params:
-            cursor.execute(sql, params)
-        else:
-            cursor.execute(sql)
-        
-        return cursor
-    except Exception:
-        cursor.close()
-        raise
+    with conn.cursor() as cursor:
+        try:
+            # Set the query timeout
+            cursor.execute(f"SET LOCK_TIMEOUT {timeout * 1000}")  # Convert to milliseconds
+
+            if params:
+                cursor.execute(sql, params)
+            else:
+                cursor.execute(sql)
+
+            return cursor
+        except Exception:
+            raise
