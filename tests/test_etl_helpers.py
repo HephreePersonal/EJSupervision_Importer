@@ -18,6 +18,7 @@ from utils.etl_helpers import (
     run_sql_step,
     run_sql_script,
     run_sql_step_with_retry,
+    load_sql,
     SQLExecutionError,
 )
 
@@ -91,3 +92,13 @@ def test_run_sql_step_with_retry_retries(monkeypatch):
         conn, 'test', 'SELECT 1', max_retries=ETLConstants.MAX_RETRY_ATTEMPTS
     )
     assert result == [('row',)]
+
+
+def test_load_sql_valid_path():
+    sql = load_sql('misc/gather_lobs.sql')
+    assert 'CREATE TABLE' in sql
+
+
+def test_load_sql_path_traversal():
+    with pytest.raises(ValueError):
+        load_sql('../utils/etl_helpers.py')
