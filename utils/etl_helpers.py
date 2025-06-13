@@ -47,8 +47,16 @@ def load_sql(filename: str, db_name: Optional[str] = None) -> str:
         SQL content with database name replaced if provided
     """
     base_dir = os.path.dirname(os.path.dirname(__file__)) if '__file__' in globals() else os.getcwd()
-    # The sql_scripts directory lives at the repo root
-    sql_path = os.path.join(base_dir, 'sql_scripts', filename)
+    scripts_dir = os.path.join(base_dir, 'sql_scripts')
+    # Normalize path to avoid path traversal outside sql_scripts
+    sql_path = os.path.abspath(os.path.normpath(os.path.join(scripts_dir, filename)))
+
+    # Ensure the final path is within the expected sql_scripts directory
+    scripts_dir_abs = os.path.abspath(scripts_dir)
+    if not sql_path.startswith(scripts_dir_abs + os.sep):
+        logger.error(f"Attempted SQL path traversal: {filename}")
+        raise ValueError(f"Invalid SQL file path: {filename}")
+
     if not os.path.exists(sql_path):
         logger.error(f"SQL file not found: {sql_path}")
         raise FileNotFoundError(f"SQL file not found: {sql_path}")
