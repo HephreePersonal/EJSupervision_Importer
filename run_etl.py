@@ -1,3 +1,12 @@
+"""Graphical wrapper to run the ETL scripts sequentially.
+
+This module provides a small Tk based application that builds a SQL Server
+connection string and launches each of the ETL scripts.  It can also be used in
+headless mode by calling :func:`run_sequential_etl` with an environment
+dictionary.  The UI exposes the most common configuration options such as the
+CSV directory and whether empty tables should be processed.
+"""
+
 import os
 import sys
 import json
@@ -182,6 +191,7 @@ class ScriptRunner(threading.Thread):
 
 class App(tk.Tk):
     def __init__(self):
+        """Initialize the main application window and start queue processing."""
         super().__init__()
         self.title("EJ Supervision Importer")
         self.resizable(True, True)
@@ -251,6 +261,7 @@ class App(tk.Tk):
             print(f"Error saving config: {e}")
     
     def _create_connection_widgets(self):
+        """Create entry fields for connection parameters and CSV directory."""
         fields = ["Driver", "Server", "Database", "User", "Password"]
         self.entries = {}
         for i, field in enumerate(fields):
@@ -286,11 +297,13 @@ class App(tk.Tk):
         test_btn.grid(row=row+2, column=0, columnspan=2, pady=10)
     
     def _browse_csv_dir(self):
+        """Open a directory chooser dialog and store the selected path."""
         directory = filedialog.askdirectory()
         if directory:
             self.csv_dir_var.set(directory)
     
     def _show_script_widgets(self):
+        """Create buttons and status labels for each ETL script."""
         if hasattr(self, "script_frame"):
             return
 
@@ -359,6 +372,7 @@ class App(tk.Tk):
         self.output_text.insert(tk.END, f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Ready to run scripts.\n\n")
     
     def _build_conn_str(self):
+        """Assemble a SQL Server ODBC connection string from the entry values."""
         driver = self.entries["driver"].get() or "{ODBC Driver 17 for SQL Server}"
         server = self.entries["server"].get()
         database = self.entries["database"].get()
@@ -375,6 +389,7 @@ class App(tk.Tk):
         return ";".join(parts)
     
     def test_connection(self):
+        """Validate the connection details entered by the user."""
         conn_str = self._build_conn_str()
         if not conn_str:
             messagebox.showerror("Error", "Please provide connection details")
@@ -406,6 +421,7 @@ class App(tk.Tk):
         self.output_text.insert(tk.END, f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Output cleared.\n\n")
     
     def run_script(self, path):
+        """Launch the selected ETL script in a background thread."""
         if not self.conn_str:
             messagebox.showerror("Error", "Please test the connection first")
             return

@@ -1,3 +1,10 @@
+"""ETL script to migrate Financial database tables to the target server.
+
+SQL files under ``sql_scripts/financial`` are executed in sequence.  Environment
+variables and command line options control the log path, CSV file location and
+whether empty tables are processed.
+"""
+
 import logging
 from utils.logging_helper import setup_logging, operation_counts
 import time

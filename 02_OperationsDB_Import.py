@@ -1,3 +1,11 @@
+"""ETL script to migrate Operations database tables.
+
+The script reads SQL under ``sql_scripts/operations`` and applies it to the
+database defined by the ``MSSQL_TARGET_CONN_STR`` environment variable.  Command
+line arguments mirror those of ``01_JusticeDB_Import.py`` allowing CSV and log
+locations to be overridden.
+"""
+
 import logging
 from utils.logging_helper import setup_logging, operation_counts
 import time
