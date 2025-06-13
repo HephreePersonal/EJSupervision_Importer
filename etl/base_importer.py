@@ -11,7 +11,13 @@ from sqlalchemy.types import Text
 
 from db.mssql import get_target_connection
 from utils.etl_helpers import load_sql, run_sql_script, log_exception_to_file
-from etl.core import sanitize_sql, safe_tqdm, load_config, validate_environment
+from etl.core import (
+    sanitize_sql,
+    safe_tqdm,
+    load_config,
+    validate_environment,
+    validate_sql_identifier,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +136,21 @@ class BaseDBImporter:
         
         cursor = conn.cursor()
         table_name = f"TablesToConvert_{self.DB_TYPE}" if self.DB_TYPE != 'Justice' else 'TablesToConvert'
+        table_name = validate_sql_identifier(table_name)
         
         try:
+            db_name = validate_sql_identifier(self.db_name)
             # Use a robust query with explicit encoding handling
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT RowID, DatabaseName, SchemaName, TableName, fConvert, ScopeRowCount,
-                       CAST(Drop_IfExists AS NVARCHAR(MAX)) AS Drop_IfExists, 
+                       CAST(Drop_IfExists AS NVARCHAR(MAX)) AS Drop_IfExists,
                        CAST(CAST(Select_Into AS NVARCHAR(MAX)) + CAST(ISNULL(Joins, N'') AS NVARCHAR(MAX)) AS NVARCHAR(MAX)) AS [Select_Into]
-                FROM {self.db_name}.dbo.{table_name} S
+                FROM {db_name}.dbo.{table_name} S
                 WHERE fConvert=1
                 ORDER BY DatabaseName, SchemaName, TableName
-            """)
+            """
+            )
             
             rows = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
@@ -155,9 +165,9 @@ class BaseDBImporter:
                     # Enhanced sanitization
                     drop_sql = sanitize_sql(row_dict.get('Drop_IfExists'))
                     select_into_sql = sanitize_sql(row_dict.get('Select_Into'))
-                    
-                    table_name = row_dict.get('TableName')
-                    schema_name = row_dict.get('SchemaName')
+
+                    table_name = validate_sql_identifier(row_dict.get('TableName'))
+                    schema_name = validate_sql_identifier(row_dict.get('SchemaName'))
                     scope_row_count = row_dict.get('ScopeRowCount')
                     full_table_name = f"{schema_name}.{table_name}"
                     
@@ -176,14 +186,18 @@ class BaseDBImporter:
                     
                     # Execute with individual error handling
                     if drop_sql.strip():
-                        logger.info(f"RowID:{idx} Drop If Exists:({self.DB_TYPE}.{full_table_name})")
+                        logger.info(
+                            f"RowID:{idx} Drop If Exists:({self.DB_TYPE}.{full_table_name})"
+                        )
                         try:
-                            cursor.execute(drop_sql)
+                            cursor.execute("EXEC sp_executesql ?", (drop_sql,))
                             conn.commit()
-                            
+
                             if select_into_sql.strip():
-                                logger.info(f"RowID:{idx} Select INTO:({self.DB_TYPE}.{full_table_name})")
-                                cursor.execute(select_into_sql)
+                                logger.info(
+                                    f"RowID:{idx} Select INTO:({self.DB_TYPE}.{full_table_name})"
+                                )
+                                cursor.execute("EXEC sp_executesql ?", (select_into_sql,))
                                 conn.commit()
                                 successful_tables += 1
                                 
@@ -218,8 +232,14 @@ class BaseDBImporter:
             return
         
         log_file = self.config['log_file']
-        pk_table = f"PrimaryKeyScripts_{self.DB_TYPE}" if self.DB_TYPE != 'Justice' else 'PrimaryKeyScripts'
-        tables_table = f"TablesToConvert_{self.DB_TYPE}" if self.DB_TYPE != 'Justice' else 'TablesToConvert'
+        pk_table = (
+            f"PrimaryKeyScripts_{self.DB_TYPE}" if self.DB_TYPE != 'Justice' else "PrimaryKeyScripts"
+        )
+        tables_table = (
+            f"TablesToConvert_{self.DB_TYPE}" if self.DB_TYPE != 'Justice' else "TablesToConvert"
+        )
+        pk_table = validate_sql_identifier(pk_table)
+        tables_table = validate_sql_identifier(tables_table)
         
         logger.info(f"Generating List of Primary Keys and NOT NULL Columns for {self.DB_TYPE} Database")
         pk_script_name = f"create_primarykeys_{self.DB_TYPE.lower()}" if self.DB_TYPE != 'Justice' else 'create_primarykeys'
@@ -228,24 +248,27 @@ class BaseDBImporter:
         run_sql_script(conn, pk_script_name, pk_sql, timeout=self.config['sql_timeout'])
         
         cursor = conn.cursor()
-        cursor.execute(f"""
+        db_name = validate_sql_identifier(self.db_name)
+        cursor.execute(
+            f"""
             WITH CTE_PKS AS (
                 SELECT 1 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script
-                FROM {self.db_name}.dbo.{pk_table} S
+                FROM {db_name}.dbo.{pk_table} S
                 WHERE S.ScriptType='NOT_NULL'
                 UNION
                 SELECT 2 AS TYPEY, S.DatabaseName, S.SchemaName, S.TableName, S.Script
-                FROM {self.db_name}.dbo.{pk_table} S
+                FROM {db_name}.dbo.{pk_table} S
                 WHERE S.ScriptType='PK'
             )
             SELECT S.TYPEY, TTC.ScopeRowCount, S.DatabaseName, S.SchemaName, S.TableName,
                    REPLACE(S.Script, 'FLAG NOT NULL', 'BIT NOT NULL') AS [Script], TTC.fConvert
             FROM CTE_PKS S
-            INNER JOIN {self.db_name}.dbo.{tables_table} TTC WITH (NOLOCK)
+            INNER JOIN {db_name}.dbo.{tables_table} TTC WITH (NOLOCK)
                 ON S.SCHEMANAME=TTC.SchemaName AND S.TABLENAME=TTC.TableName
             WHERE TTC.fConvert=1
             ORDER BY S.SCHEMANAME, S.TABLENAME, S.TYPEY
-        """)
+        """
+        )
         rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
         
@@ -253,14 +276,14 @@ class BaseDBImporter:
             row_dict = dict(zip(columns, row))
             createpk_sql = row_dict.get('Script')
             scope_row_count = row_dict.get('ScopeRowCount')
-            schema_name = row_dict.get('SchemaName')
-            table_name = row_dict.get('TableName')
+            schema_name = validate_sql_identifier(row_dict.get('SchemaName'))
+            table_name = validate_sql_identifier(row_dict.get('TableName'))
             full_table_name = f"{schema_name}.{table_name}"
             
             logger.info(f"Executing Primary Key/NOT NULL for row {idx} ({self.DB_TYPE}.{full_table_name})")
             if (scope_row_count != 0 or scope_row_count is not None) or self.config['include_empty_tables']:       
                 try:
-                    cursor.execute(createpk_sql)
+                    cursor.execute("EXEC sp_executesql ?", (createpk_sql,))
                     conn.commit()
                 except Exception as e:
                     error_msg = f"Error executing PK statements for row {idx} ({self.DB_TYPE}.{full_table_name}): {e}"
