@@ -111,7 +111,17 @@ def sanitize_sql(sql_text):
         
         # Normalize Unicode
         sql_text = unicodedata.normalize('NFKC', sql_text)
-        
+
+        # Basic guard against common injection patterns. If a pattern is
+        # detected return an empty string so the caller can decide how to
+        # handle it. This keeps legitimate statements like "DROP TABLE IF
+        # EXISTS" intact because those are not preceded by a trailing quote
+        # and semicolon.
+        injection_regex = re.compile(r"';\s*(drop|delete|insert|update)\s",
+                                    re.IGNORECASE)
+        if injection_regex.search(sql_text):
+            return ""
+
         return sql_text
         
     except Exception as e:

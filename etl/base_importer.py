@@ -169,63 +169,69 @@ class BaseDBImporter:
                 for idx, row in enumerate(safe_tqdm(rows, desc="Drop/Select", unit="table"), 1):
                     try:
                         row_dict = dict(zip(columns, row))
-                    
-                    # Enhanced sanitization
-                    drop_sql = sanitize_sql(row_dict.get('Drop_IfExists'))
-                    select_into_sql = sanitize_sql(row_dict.get('Select_Into'))
 
-                    table_name = validate_sql_identifier(row_dict.get('TableName'))
-                    schema_name = validate_sql_identifier(row_dict.get('SchemaName'))
-                    scope_row_count = row_dict.get('ScopeRowCount')
-                    full_table_name = f"{schema_name}.{table_name}"
-                    
-                    # Skip if sanitization completely failed
-                    if not drop_sql or not select_into_sql:
-                        error_msg = f"Skipping row {idx} ({full_table_name}): SQL sanitization failed"
-                        logger.error(error_msg)
-                        log_exception_to_file(error_msg, log_file)
-                        failed_tables += 1
-                        continue
-                    
-                    # Skip empty tables unless configured to include them
-                    if not self.config['include_empty_tables'] and (scope_row_count is None or int(scope_row_count) <= 0):
-                        logger.info(f"Skipping Select INTO for {full_table_name}: scope_row_count is {scope_row_count}")
-                        continue
-                    
-                    # Execute with individual error handling
-                    if drop_sql.strip():
-                        logger.info(
-                            f"RowID:{idx} Drop If Exists:({self.DB_TYPE}.{full_table_name})"
-                        )
-                        try:
-                            run_sql_step_with_retry(
-                                conn,
-                                f"Drop {full_table_name}",
-                                drop_sql,
-                                timeout=self.config['sql_timeout'],
-                            )
+                        # Enhanced sanitization
+                        drop_sql = sanitize_sql(row_dict.get('Drop_IfExists'))
+                        select_into_sql = sanitize_sql(row_dict.get('Select_Into'))
 
-                            if select_into_sql.strip():
-                                logger.info(
-                                    f"RowID:{idx} Select INTO:({self.DB_TYPE}.{full_table_name})"
-                                )
-                                run_sql_step_with_retry(
-                                    conn,
-                                    f"SelectInto {full_table_name}",
-                                    select_into_sql,
-                                    timeout=self.config['sql_timeout'],
-                                )
+                        table_name = validate_sql_identifier(row_dict.get('TableName'))
+                        schema_name = validate_sql_identifier(row_dict.get('SchemaName'))
+                        scope_row_count = row_dict.get('ScopeRowCount')
+                        full_table_name = f"{schema_name}.{table_name}"
 
-                            conn.commit()
-                            successful_tables += 1
-
-                        except Exception as sql_error:
-                            conn.rollback()
-                            error_msg = f"SQL execution error for row {idx} ({full_table_name}): {str(sql_error)}"
+                        # Skip if sanitization completely failed
+                        if not drop_sql or not select_into_sql:
+                            error_msg = f"Skipping row {idx} ({full_table_name}): SQL sanitization failed"
                             logger.error(error_msg)
                             log_exception_to_file(error_msg, log_file)
                             failed_tables += 1
-                            # Continue with next table instead of stopping
+                            continue
+
+                        # Skip empty tables unless configured to include them
+                        if not self.config['include_empty_tables'] and (
+                            scope_row_count is None or int(scope_row_count) <= 0
+                        ):
+                            logger.info(
+                                f"Skipping Select INTO for {full_table_name}: scope_row_count is {scope_row_count}"
+                            )
+                            continue
+
+                        # Execute with individual error handling
+                        if drop_sql.strip():
+                            logger.info(
+                                f"RowID:{idx} Drop If Exists:({self.DB_TYPE}.{full_table_name})"
+                            )
+                            try:
+                                run_sql_step_with_retry(
+                                    conn,
+                                    f"Drop {full_table_name}",
+                                    drop_sql,
+                                    timeout=self.config['sql_timeout'],
+                                )
+
+                                if select_into_sql.strip():
+                                    logger.info(
+                                        f"RowID:{idx} Select INTO:({self.DB_TYPE}.{full_table_name})"
+                                    )
+                                    run_sql_step_with_retry(
+                                        conn,
+                                        f"SelectInto {full_table_name}",
+                                        select_into_sql,
+                                        timeout=self.config['sql_timeout'],
+                                    )
+
+                                conn.commit()
+                                successful_tables += 1
+
+                            except Exception as sql_error:
+                                conn.rollback()
+                                error_msg = (
+                                    f"SQL execution error for row {idx} ({full_table_name}): {str(sql_error)}"
+                                )
+                                logger.error(error_msg)
+                                log_exception_to_file(error_msg, log_file)
+                                failed_tables += 1
+                                # Continue with next table instead of stopping
 
                     except Exception as row_error:
                         error_msg = f"Row processing error for row {idx}: {str(row_error)}"
