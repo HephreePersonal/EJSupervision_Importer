@@ -30,7 +30,9 @@ SCRIPTS = [
     ("LOB Column Processing", "04_LOBColumns.py"),
 ]
 
-CONFIG_FILE = os.path.join("config", "values.json")
+# Use an absolute path so the helper works regardless of the current
+# working directory.
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config", "values.json")
 # Add this code to run_etl.py to make it work with our new modular structure
 
 def run_sequential_etl(env):
