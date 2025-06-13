@@ -4,11 +4,44 @@ import os
 import json
 import re
 import unicodedata
+from dataclasses import dataclass, field
 from tqdm import tqdm
 
 _IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 logger = logging.getLogger(__name__)
+
+
+class ConfigError(Exception):
+    """Raised when required configuration is missing or invalid."""
+    pass
+
+
+@dataclass
+class Settings:
+    """Configuration loaded from environment variables."""
+
+    mssql_target_conn_str: str = field(default_factory=lambda: os.getenv("MSSQL_TARGET_CONN_STR"))
+    ej_csv_dir: str = field(default_factory=lambda: os.getenv("EJ_CSV_DIR"))
+    ej_log_dir: str = field(default_factory=lambda: os.getenv("EJ_LOG_DIR", os.getcwd()))
+    include_empty_tables: bool = field(default_factory=lambda: os.getenv("INCLUDE_EMPTY_TABLES", "0") == "1")
+    sql_timeout: int = field(default_factory=lambda: int(os.getenv("SQL_TIMEOUT", "300")))
+
+    def __post_init__(self) -> None:
+        missing = []
+        if not self.mssql_target_conn_str:
+            missing.append("MSSQL_TARGET_CONN_STR")
+        if not self.ej_csv_dir:
+            missing.append("EJ_CSV_DIR")
+
+        if missing:
+            raise ConfigError("Missing required environment variables: " + ", ".join(missing))
+
+        if not os.path.exists(self.ej_csv_dir):
+            raise ConfigError(f"EJ_CSV_DIR path does not exist: {self.ej_csv_dir}")
+
+        if self.sql_timeout <= 0:
+            raise ConfigError("SQL_TIMEOUT must be a positive integer")
 
 def validate_environment(required_vars, optional_vars):
     """Validate environment variables with custom requirements."""
