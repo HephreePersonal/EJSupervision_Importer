@@ -23,6 +23,7 @@ from etl.core import (
     validate_environment,
     validate_sql_identifier,
 )
+from config import ETLConstants
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class BaseDBImporter:
             "csv_filename": self.DEFAULT_CSV_FILE,
             "log_filename": self.DEFAULT_LOG_FILE,
             "skip_pk_creation": False,
-            "sql_timeout": 300,  # seconds
+            "sql_timeout": ETLConstants.DEFAULT_SQL_TIMEOUT,  # seconds
         }
         
         self.config = load_config(args.config_file, default_config)
