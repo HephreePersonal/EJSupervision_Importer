@@ -46,7 +46,12 @@ def parse_args():
         help="Path to JSON configuration file with all settings."
     )
     parser.add_argument(
-        "--verbose", "-v", 
+        "--batch-size",
+        type=int,
+        help="Number of rows to fetch per batch when processing LOB columns."
+    )
+    parser.add_argument(
+        "--verbose", "-v",
         action="store_true",
         help="Enable verbose logging."
     )
@@ -88,6 +93,7 @@ def load_config(config_file=None):
         "include_empty_tables": False,
         "log_filename": DEFAULT_LOG_FILE,
         "sql_timeout": 300,  # seconds
+        "batch_size": 100,
     }
     
     if config_file and os.path.exists(config_file):
@@ -164,53 +170,64 @@ def gather_lob_columns(conn, config, log_file):
         ORDER BY s.[NAME], t.[NAME], c.[NAME]
         """, timeout=config['sql_timeout'])
 
-        rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
 
+        batch_size = config.get('batch_size', 100)
+        processed = 0
+        progress = tqdm(desc="Analyzing LOB Columns", unit="column")
+
         with conn.cursor() as update_cursor:
-            for idx, row in enumerate(tqdm(rows, desc="Analyzing LOB Columns", unit="column"), 1):
-                row_dict = dict(zip(columns, row))
-                schema_name = row_dict.get('SchemaName')
-                table_name = row_dict.get('TableName')
-                column_name = row_dict.get('ColumnName')
-                datatype = row_dict.get('DataType')
-                row_cnt = row_dict.get('RowCnt') or 0
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+                for row in rows:
+                    row_dict = dict(zip(columns, row))
+                    schema_name = row_dict.get('SchemaName')
+                    table_name = row_dict.get('TableName')
+                    column_name = row_dict.get('ColumnName')
+                    datatype = row_dict.get('DataType')
+                    row_cnt = row_dict.get('RowCnt') or 0
 
-                if not config['include_empty_tables'] and row_cnt <= 0:
-                    logger.info(f"Skipping {schema_name}.{table_name}.{column_name}: row count is {row_cnt}")
-                    continue
+                    if not config['include_empty_tables'] and row_cnt <= 0:
+                        logger.info(f"Skipping {schema_name}.{table_name}.{column_name}: row count is {row_cnt}")
+                        continue
 
-                try:
-                    max_length = get_max_length(conn, schema_name, table_name, column_name, datatype, config['sql_timeout'])
-                    alter_column_sql = build_alter_column_sql(schema_name, table_name, column_name, datatype, max_length)
+                    try:
+                        max_length = get_max_length(conn, schema_name, table_name, column_name, datatype, config['sql_timeout'])
+                        alter_column_sql = build_alter_column_sql(schema_name, table_name, column_name, datatype, max_length)
 
-                    insert_sql = f"""
-                        INSERT INTO {DB_NAME}.dbo.LOB_COLUMN_UPDATES
-                        (SchemaName, TableName, ColumnName, DataType, CurrentLength, RowCnt, MaxLen, AlterStatement)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """
-                    update_cursor.execute(
-                        insert_sql,
-                        (
-                            schema_name,
-                            table_name,
-                            column_name,
-                            datatype,
-                            row_dict.get('CurrentLength'),
-                            row_cnt,
-                            max_length,
-                            alter_column_sql
-                        ),
-                        timeout=config['sql_timeout']
-                    )
-                    conn.commit()
+                        insert_sql = f"""
+                            INSERT INTO {DB_NAME}.dbo.LOB_COLUMN_UPDATES
+                            (SchemaName, TableName, ColumnName, DataType, CurrentLength, RowCnt, MaxLen, AlterStatement)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """
+                        update_cursor.execute(
+                            insert_sql,
+                            (
+                                schema_name,
+                                table_name,
+                                column_name,
+                                datatype,
+                                row_dict.get('CurrentLength'),
+                                row_cnt,
+                                max_length,
+                                alter_column_sql
+                            ),
+                            timeout=config['sql_timeout']
+                        )
+                        conn.commit()
 
-                except Exception as e:
-                    error_msg = f"Error processing LOB column {schema_name}.{table_name}.{column_name}: {e}"
-                    logger.error(error_msg)
-                    log_exception_to_file(error_msg, log_file)
+                    except Exception as e:
+                        error_msg = f"Error processing LOB column {schema_name}.{table_name}.{column_name}: {e}"
+                        logger.error(error_msg)
+                        log_exception_to_file(error_msg, log_file)
 
-            logger.info(f"Analyzed and cataloged {len(rows)} LOB columns")
+                    processed += 1
+                    progress.update(1)
+
+        progress.close()
+        logger.info(f"Analyzed and cataloged {processed} LOB columns")
 
 def execute_lob_column_updates(conn, config, log_file):
     """Execute the ALTER statements to optimize LOB columns."""
@@ -268,17 +285,21 @@ def main():
         
         # Load and merge configuration
         config = load_config(args.config_file)
-        
+
         # Override config with environment variables
         if os.environ.get("INCLUDE_EMPTY_TABLES") == "1":
             config["include_empty_tables"] = True
         if os.environ.get("SQL_TIMEOUT"):
             config["sql_timeout"] = int(os.environ.get("SQL_TIMEOUT"))
-        
+        if os.environ.get("BATCH_SIZE"):
+            config["batch_size"] = int(os.environ.get("BATCH_SIZE"))
+
         # Override config with command line arguments
         if args.include_empty:
             config["include_empty_tables"] = True
-        
+        if args.batch_size:
+            config["batch_size"] = args.batch_size
+
         # Set up log file path
         config['log_file'] = args.log_file or os.path.join(
             os.environ.get("EJ_LOG_DIR", ""), 
