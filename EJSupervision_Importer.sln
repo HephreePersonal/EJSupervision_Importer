@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36202.13 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "EJSupervision_Importer", "EJSupervision_Importer.pyproj", "{3FD72A63-F71A-4600-97A6-4BBA4BCA3B96}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "EJSupervision_Importer", "EJSupervision_Importer.pyproj", "{45FF897C-C5A2-49A1-BFEC-9BEB9D736E63}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,13 +11,13 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3FD72A63-F71A-4600-97A6-4BBA4BCA3B96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3FD72A63-F71A-4600-97A6-4BBA4BCA3B96}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45FF897C-C5A2-49A1-BFEC-9BEB9D736E63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45FF897C-C5A2-49A1-BFEC-9BEB9D736E63}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {F61EDFEC-A446-40D4-8DEB-228FF2E6AACB}
+		SolutionGuid = {B7A63A5E-D85B-4268-B1C8-3352C0174097}
 	EndGlobalSection
 EndGlobal
