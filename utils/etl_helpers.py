@@ -1,3 +1,5 @@
+"""Helper functions for executing SQL statements with logging and retries."""
+
 import logging
 from utils.logging_helper import record_success, record_failure
 import os

@@ -1,3 +1,5 @@
+"""Logging utilities with correlation IDs and success/failure counters."""
+
 import logging
 import uuid
 from contextvars import ContextVar

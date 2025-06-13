@@ -1,3 +1,11 @@
+"""Optimize LOB columns for migration by determining appropriate sizes.
+
+This script analyzes large object columns in the target database and writes
+ALTER statements to resize them as needed.  It relies on configuration from
+``MSSQL_TARGET_CONN_STR`` and accepts command line options for logging and
+batch size.
+"""
+
 import logging
 from utils.logging_helper import setup_logging, operation_counts
 import time
