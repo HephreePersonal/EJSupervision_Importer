@@ -1,11 +1,12 @@
 """Helper functions for executing SQL statements with logging and retries."""
 
 import logging
-from utils.logging_helper import record_success, record_failure
 import os
 import time
-from typing import Optional, Any, List
 from contextlib import contextmanager
+from typing import Any, Generator, List, Optional
+
+from utils.logging_helper import record_success, record_failure
 
 from config import ETLConstants
 
@@ -26,7 +27,7 @@ class SQLExecutionError(ETLError):
 logger = logging.getLogger(__name__)
 
 
-def log_exception_to_file(error_details: str, log_path: str):
+def log_exception_to_file(error_details: str, log_path: str) -> None:
     """Append exception details to a log file."""
     try:
         with open(log_path, "a", encoding="utf-8") as f:
@@ -36,7 +37,7 @@ def log_exception_to_file(error_details: str, log_path: str):
 
 
 @contextmanager
-def transaction_scope(conn):
+def transaction_scope(conn: Any) -> Generator[Any, None, None]:
     """Context manager to run a series of statements in a transaction.
 
     It temporarily disables ``autocommit`` on the provided connection and
@@ -94,7 +95,7 @@ def load_sql(filename: str, db_name: Optional[str] = None) -> str:
     
     return sql
 def run_sql_step(
-    conn, name: str, sql: str, timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT
+    conn: Any, name: str, sql: str, timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT
 ) -> Optional[List[Any]]:
     """Execute a single SQL statement and fetch any results.
     
@@ -135,7 +136,7 @@ def run_sql_step(
 
 
 def run_sql_step_with_retry(
-    conn,
+    conn: Any,
     name: str,
     sql: str,
     timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT,
@@ -162,8 +163,8 @@ def run_sql_step_with_retry(
 
             time.sleep(2**attempt)
 def run_sql_script(
-    conn, name: str, sql: str, timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT
-):
+    conn: Any, name: str, sql: str, timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT
+) -> None:
     """Execute a multi-statement SQL script.
     
     Args:
@@ -211,9 +212,9 @@ def run_sql_script(
         record_failure()
         raise SQLExecutionError(sql, e, table_name=name)
 def execute_sql_with_timeout(
-    conn,
+    conn: Any,
     sql: str,
-    params: Optional[tuple] = None,
+    params: Optional[tuple[Any, ...]] = None,
     timeout: int = ETLConstants.DEFAULT_SQL_TIMEOUT,
 ) -> Any:
     """Execute SQL with parameters and timeout.
