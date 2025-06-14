@@ -5,6 +5,7 @@ from utils.logging_helper import record_success, record_failure
 import os
 import time
 from typing import Optional, Any, List
+from contextlib import contextmanager
 
 from config import ETLConstants
 
@@ -32,6 +33,28 @@ def log_exception_to_file(error_details: str, log_path: str):
             f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {error_details}\n")
     except Exception as file_exc:
         logger.error(f"Failed to write to error log file: {file_exc}")
+
+
+@contextmanager
+def transaction_scope(conn):
+    """Context manager to run a series of statements in a transaction.
+
+    It temporarily disables ``autocommit`` on the provided connection and
+    ensures that the connection is committed if the block succeeds or
+    rolled back if an exception is raised.  The original ``autocommit``
+    setting is restored afterwards.
+    """
+
+    original_autocommit = getattr(conn, "autocommit", False)
+    conn.autocommit = False
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.autocommit = original_autocommit
 def load_sql(filename: str, db_name: Optional[str] = None) -> str:
     """Load a SQL file from the sql_scripts directory.
 
