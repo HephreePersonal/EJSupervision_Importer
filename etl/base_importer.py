@@ -1,12 +1,16 @@
 """Base class for database import operations."""
 
+from __future__ import annotations
+
 import logging
 import os
+import argparse
 import tkinter as tk
 from tkinter import messagebox
 import pandas as pd
 import urllib
 import sqlalchemy
+from typing import Any, Optional
 from sqlalchemy.types import Text
 
 from db.mssql import get_target_connection
@@ -36,16 +40,16 @@ class BaseDBImporter:
     DEFAULT_LOG_FILE = "PreDMSErrorLog_Base.txt"
     DEFAULT_CSV_FILE = "EJ_Base_Selects_ALL.csv"
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the importer with default values."""
         self.config = None
         self.db_name = None
 
-    def parse_args(self):
+    def parse_args(self) -> argparse.Namespace:
         """Parse command line arguments - implement in subclasses."""
         raise NotImplementedError("Subclasses must implement parse_args()")
 
-    def validate_environment(self):
+    def validate_environment(self) -> None:
         """Validate required environment variables."""
         required_vars = {
             'MSSQL_TARGET_CONN_STR': "Database connection string is required",
@@ -60,7 +64,7 @@ class BaseDBImporter:
         
         validate_environment(required_vars, optional_vars)
 
-    def load_config(self, args):
+    def load_config(self, args: argparse.Namespace) -> None:
         """Load configuration from arguments and environment."""
         default_config = {
             "include_empty_tables": False,
@@ -95,7 +99,7 @@ class BaseDBImporter:
             self.config["csv_filename"]
         )
 
-    def import_joins(self):
+    def import_joins(self) -> sqlalchemy.engine.Engine:
         """Import JOIN statements from CSV to build selection queries."""
         logger.info(f"Importing JOINS from {self.DB_TYPE} Selects CSV")
         
@@ -136,7 +140,7 @@ class BaseDBImporter:
         logger.info(f"Successfully imported {len(df)} JOIN definitions from {csv_path}")
         return engine
 
-    def execute_table_operations(self, conn):
+    def execute_table_operations(self, conn: Any) -> None:
         """Execute DROP and SELECT INTO operations."""
         logger.info("Executing table operations (DROP/SELECT)")
         log_file = self.config['log_file']
@@ -248,7 +252,7 @@ class BaseDBImporter:
 
         logger.info(f"Table operations completed: {successful_tables} successful, {failed_tables} failed")
 
-    def create_primary_keys(self, conn):
+    def create_primary_keys(self, conn: Any) -> None:
         """Create primary keys and NOT NULL constraints."""
         if self.config['skip_pk_creation']:
             logger.info("Skipping primary key and constraint creation as requested in configuration")
@@ -324,7 +328,7 @@ class BaseDBImporter:
 
         logger.info(f"All Primary Key/NOT NULL statements executed FOR THE {self.DB_TYPE} DATABASE.")
 
-    def show_completion_message(self, next_step_name=None):
+    def show_completion_message(self, next_step_name: Optional[str] = None) -> bool:
         """Show a message box indicating completion and asking to continue."""
         root = tk.Tk()
         root.withdraw()  # Hide the main window
@@ -343,7 +347,7 @@ class BaseDBImporter:
             root.destroy()
             return False
 
-    def run(self):
+    def run(self) -> bool:
         """Template method - main execution flow."""
         try:
             # Parse command line args and load config
@@ -415,18 +419,18 @@ class BaseDBImporter:
     
     # Methods that must be implemented by subclasses
     
-    def execute_preprocessing(self, conn):
+    def execute_preprocessing(self, conn: Any) -> None:
         """Execute database-specific preprocessing steps."""
         raise NotImplementedError("Subclasses must implement execute_preprocessing()")
     
-    def prepare_drop_and_select(self, conn):
+    def prepare_drop_and_select(self, conn: Any) -> None:
         """Prepare SQL statements for dropping and selecting data."""
         raise NotImplementedError("Subclasses must implement prepare_drop_and_select()")
     
-    def update_joins_in_tables(self, conn):
+    def update_joins_in_tables(self, conn: Any) -> None:
         """Update tables with JOINs."""
         raise NotImplementedError("Subclasses must implement update_joins_in_tables()")
     
-    def get_next_step_name(self):
+    def get_next_step_name(self) -> str:
         """Return the name of the next step in the ETL process."""
         raise NotImplementedError("Subclasses must implement get_next_step_name()")

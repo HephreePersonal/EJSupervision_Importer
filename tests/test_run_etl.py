@@ -171,3 +171,53 @@ def test_show_script_widgets_preserves_order(monkeypatch, tmp_path):
     app._show_script_widgets()
 
     assert list(app.run_buttons.keys()) == [p for _, p in run_etl.SCRIPTS]
+
+
+def test_build_conn_str(tmp_path):
+    run_etl = _import_run_etl_from_repo(tmp_path)
+
+    class DummyEntry:
+        def __init__(self, val):
+            self._v = val
+        def get(self):
+            return self._v
+
+    app = types.SimpleNamespace(
+        entries={
+            'driver': DummyEntry('{SQL}'),
+            'server': DummyEntry('srv'),
+            'database': DummyEntry('db'),
+            'user': DummyEntry('u'),
+            'password': DummyEntry('p'),
+        }
+    )
+
+    assert run_etl.App._build_conn_str(app) == 'DRIVER={SQL};SERVER=srv;DATABASE=db;UID=u;PWD=p'
+
+
+def test_run_sequential_etl_restores_env(monkeypatch, tmp_path):
+    run_etl = _import_run_etl_from_repo(tmp_path)
+
+    calls = []
+    def make_mod(name, ret=True):
+        mod = types.SimpleNamespace()
+        def main():
+            calls.append(name)
+            return ret
+        mod.main = main
+        return mod
+
+    modules = {
+        '01_JusticeDB_Import': make_mod('01'),
+        '02_OperationsDB_Import': make_mod('02', ret=False),
+        '03_FinancialDB_Import': make_mod('03'),
+        '04_LOBColumns': make_mod('04'),
+    }
+    for name, mod in modules.items():
+        monkeypatch.setitem(sys.modules, name, mod)
+
+    monkeypatch.setenv('FOO', 'old')
+    run_etl.run_sequential_etl({'FOO': 'new'})
+
+    assert os.environ['FOO'] == 'old'
+    assert calls == ['01', '02']
